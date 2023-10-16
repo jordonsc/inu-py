@@ -47,5 +47,4 @@ In addition, you'll require some core libraries that are optional on _MicroPytho
 
 * `base64`
 * `datetime`
-* `json`
 * `logging`
