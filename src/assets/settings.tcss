@@ -1,0 +1,42 @@
+Screen {
+    layout: vertical;
+}
+
+.box {
+    height: 7;
+    border: solid green;
+}
+
+.setting_title {
+    color: white;
+    padding-left: 2;
+    height: 1;
+}
+
+.setting_hint {
+    color: grey;
+    padding-left: 2;
+    height: 1
+}
+
+Markdown {
+    padding: 0 1 0 1;
+    margin: 0;
+}
+
+.error_hint {
+    border: solid red;
+    padding: 0 1 0 1;
+}
+
+.error_hint.success {
+    border: solid greenyellow;
+}
+
+.error_hint.working {
+    border: solid cyan;
+}
+
+.hidden {
+    display: none;
+}

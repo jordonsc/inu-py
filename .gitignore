@@ -1,0 +1,7 @@
+*.pyc
+.idea
+build/*
+config/*
+venv/
+
+!.gitkeep
