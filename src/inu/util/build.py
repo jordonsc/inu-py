@@ -79,7 +79,11 @@ class Build(Utility):
             mpremote.do_connect(self.state, MpArgs(device=[port]))
 
         self.logger.info("Sending content..")
-        mc = self.get_lib_root(short_form=True)
+
+        self.send_file(f"config/{device_id[0]}.json", "settings.json")
+        self.send_files(f"apps/{device_id[0]}")
+        self.send_files("src/inu", "inu")
+        return
 
         # Core app
         self.send_files(f"apps/{device_id[0]}")
@@ -90,6 +94,7 @@ class Build(Utility):
 
         # MicroPython libs
         self.mkdir("lib")
+        mc = self.get_lib_root(short_form=True)
         self.send_file(f"{mc}/python-stdlib/base64/base64.py", "lib/base64.py")
         self.send_file(f"{mc}/python-stdlib/datetime/datetime.py", "lib/datetime.py")
         self.send_file(f"{mc}/python-stdlib/logging/logging.py", "lib/logging.py")

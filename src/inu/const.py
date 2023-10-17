@@ -28,8 +28,7 @@ class DeviceType:
     RANGE = "range"
 
     # Motorised actuator or physical pulley, winch, etc
-    ACTUATOR = "actuator"
-    DOOR = "door"
+    ROBOTICS = "robotics"
 
 
 class Context:
@@ -74,10 +73,9 @@ class Subjects:
     # Commands require action from other devices, such as a trigger
     # {...}
     COMMAND = 'cmd'
-    COMMAND_SUB = {
-        # trigger may include sensor parameters, like distance, light level, motion level, etc
-        'trigger',
-    }
+
+    # {'code': int, ...}
+    COMMAND_TRIGGER = 'trigger'
 
     # Heartbeats let a controller know that you're still alive and detect devices going offline
     # {'uptime': int64}

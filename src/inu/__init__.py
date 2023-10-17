@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import time
 
@@ -26,6 +27,7 @@ class Inu(io.IoHandler):
         self.settings = Settings()
         self.handler = handler
         self.pool = TaskPool()
+        self.has_settings = False
 
         if isinstance(self.context.device_id, list):
             self.device_id = ".".join(self.context.device_id)
@@ -110,10 +112,13 @@ class Inu(io.IoHandler):
     async def _on_settings(self, msg: model.Message):
         try:
             self.settings = self.context.settings_class(msg.get_payload())
+            self.has_settings = True
             await self.js.msg.ack(msg)
+            await self.log("Applied new settings")
         except Exception as e:
-            self.logger.error(f"Error updating device settings: {type(e).__name__}: {e}")
             await self.js.msg.nack(msg)
+            await self.log(f"Error applying new settings: {type(e).__name__}: {e}")
+            self.logger.error(f"Error updating device settings: {type(e).__name__}: {e}")
 
         if self.handler:
             self.pool.run(self.handler.on_settings_updated())
@@ -157,6 +162,21 @@ class Inu(io.IoHandler):
 
         except asyncio.CancelledError:
             self.logger.debug(f"Heartbeat dying")
+
+    async def command(self, sub_cmd: str, data: dict = None):
+        """
+        Dispatch a command + sub-command message.
+        """
+        if data is None:
+            data = {}
+
+        try:
+            await self.nats.publish(
+                const.Subjects.fqs([const.Subjects.COMMAND, sub_cmd], self.device_id),
+                json.dumps(data)
+            )
+        except Exception as e:
+            self.logger.error(f"Command error: {type(e).__name__}: {str(e)}")
 
     async def log(self, message: str, level: str = const.LogLevel.INFO):
         """

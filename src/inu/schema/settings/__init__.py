@@ -12,10 +12,6 @@ class Settings(Schema):
     heartbeat_interval_min: int = 1
     heartbeat_interval_max: int = 60
 
-    listen_subjects: str = ""
-    listen_subjects_hint: str = "Will respond to messages (such as triggers) from subjects matching these strings; " \
-                                "space delimited"
-
 
 class CooldownDevice:
     """
@@ -26,7 +22,16 @@ class CooldownDevice:
     cooldown_time_min: int = 0
 
 
-class Relay(Settings):
+class ActionDevice:
+    """
+    Device listens to commands from other devices.
+    """
+    listen_subjects: str = ""
+    listen_subjects_hint: str = "Will respond to messages (such as triggers) from subjects matching these strings; " \
+                                "space delimited"
+
+
+class Relay(Settings, ActionDevice):
     """
     ## An on-off or timer based power relay.
 
@@ -66,16 +71,14 @@ def get_device_settings_class(dvc: str) -> type:
     """
     Find the correct settings class for the given device type.
     """
-    from . import sensors, actuators
+    from . import sensors, robotics
 
     if dvc == DeviceType.MOTION:
         return sensors.MotionSensor
     elif dvc == DeviceType.RANGE:
         return sensors.RangeTrigger
-    elif dvc == DeviceType.ACTUATOR:
-        return actuators.Actuator
-    elif dvc == DeviceType.DOOR:
-        return actuators.Door
+    elif dvc == DeviceType.ROBOTICS:
+        return robotics.Robotics
     elif dvc == DeviceType.RELAY:
         return Relay
     else:

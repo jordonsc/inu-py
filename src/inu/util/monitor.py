@@ -94,6 +94,17 @@ class Monitor(Utility, InuHandler):
                     )), self.on_settings,
                 )
 
+            if self.args.commands:
+                stream_tally += 1
+                await self.inu.js.consumer.create(
+                    Consumer(const.Streams.COMMAND, ConsumerConfig(
+                        subjects=const.Subjects.all(const.Subjects.COMMAND),
+                        deliver_policy=del_pol,
+                        opt_start_time=start_time,
+                        ack_wait=5,
+                    )), self.on_command,
+                )
+
             if self.args.logs or stream_tally == 0:
                 stream_tally += 1
                 await self.inu.js.consumer.create(
@@ -173,5 +184,12 @@ class Monitor(Utility, InuHandler):
         def handle_hb():
             device_id = msg.get_subject()[len(const.Subjects.SETTINGS) + 1:]
             print(f"<{device_id}> NEW SETTINGS :: {msg.get_payload().decode()}")
+
+        await self.handle_msg(msg, handle_hb)
+
+    async def on_command(self, msg: model.Message):
+        def handle_hb():
+            device_id = msg.get_subject()[len(const.Subjects.COMMAND) + 1:]
+            print(f"<{device_id}> CMD :: {msg.get_payload().decode()}")
 
         await self.handle_msg(msg, handle_hb)

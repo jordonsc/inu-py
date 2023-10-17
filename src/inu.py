@@ -42,6 +42,8 @@ monitor_parser.add_argument('-a', '--alerts', dest="alerts", action='store_true'
                             help="includes alerts in stream")
 monitor_parser.add_argument('-b', '--heartbeats', dest="heartbeats", action='store_true',
                             help="includes heartbeats in stream")
+monitor_parser.add_argument('-c', '--commands', dest="commands", action='store_true',
+                            help="includes commands in stream")
 monitor_parser.add_argument('-s', '--settings', dest="settings", action='store_true',
                             help="includes settings changes in stream")
 monitor_parser.add_argument('-t', '--time', dest="time", action='store',

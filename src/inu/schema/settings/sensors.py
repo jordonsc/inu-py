@@ -1,7 +1,15 @@
 from . import Settings, CooldownDevice
 
 
-class MotionSensor(Settings, CooldownDevice):
+class TriggerDevice(Settings, CooldownDevice):
+    """
+    A device that sends a trigger command.
+    """
+    trigger_code: int = 0
+    trigger_code_hint: str = "Code to include in the trigger; may correlate to a sequence code"
+
+
+class MotionSensor(TriggerDevice):
     """
     ## A motion sensor.
     """
@@ -11,7 +19,7 @@ class MotionSensor(Settings, CooldownDevice):
     sensitivity_max: int = 100
 
 
-class RangeTrigger(Settings, CooldownDevice):
+class RangeTrigger(TriggerDevice):
     """
     ## A range-based trip sensor.
 
