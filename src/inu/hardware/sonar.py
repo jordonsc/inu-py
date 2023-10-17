@@ -10,7 +10,6 @@ class Sonar(RangingSensor):
 
     def __init__(self, uart: int = 1, tx: int = None, rx: int = None, baud: int = 9600):
         self.logger = logging.getLogger('inu.hw.sonar')
-        print(f"Create UART on {uart}; baud: {baud}; tx: {tx}; rx: {rx}")
         self.uart = machine.UART(uart, baudrate=baud, tx=tx, rx=rx)
 
         self.distance: int | None = None
@@ -41,7 +40,7 @@ class Sonar(RangingSensor):
         return cs == data[3]
 
     async def read_loop(self):
-        print("Starting read loop..")
+        self.logger.debug("Starting read loop..")
         while True:
             if self.uart.any() >= 128:
                 self.logger.warning("UART buffer overflow, flushing")
@@ -60,8 +59,11 @@ class Sonar(RangingSensor):
                     await self.flush_uart()
                     continue
 
-                self.distance = data[1] * 256 + data[2]
-                self.last_measured = time.time()
+                distance = data[1] * 256 + data[2]
+                if distance > 0:
+                    # a distance of exactly zero is a bad sensor reading
+                    self.distance = distance
+                    self.last_measured = time.time()
 
             await asyncio.sleep(0.01)
 
