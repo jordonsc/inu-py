@@ -3,8 +3,8 @@ from datetime import datetime, timezone
 
 class Time:
     @staticmethod
-    def sec_to_nano(sec: float) -> float:
-        return sec * 10 ** 9
+    def sec_to_nano(sec: float) -> int:
+        return round(sec * 10 ** 9)
 
     @staticmethod
     def format_timestamp(timestamp: float) -> str:

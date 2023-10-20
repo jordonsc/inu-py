@@ -14,6 +14,7 @@ from micro_nats.jetstream.error import ErrorResponseException
 
 from micro_nats.jetstream.protocol.consumer import Consumer, ConsumerConfig
 from micro_nats import error as mn_error, model
+from micro_nats.util import Time
 
 
 class Monitor(Utility, InuHandler):
@@ -48,6 +49,7 @@ class Monitor(Utility, InuHandler):
             return
 
         stream_tally = 0
+        ack_wait = Time.sec_to_nano(1.5)
 
         start_time = self.args.time
         if start_time:
@@ -68,7 +70,7 @@ class Monitor(Utility, InuHandler):
                         subjects=const.Subjects.all(const.Subjects.HEARTBEAT),
                         deliver_policy=del_pol,
                         opt_start_time=start_time,
-                        ack_wait=5,
+                        ack_wait=ack_wait,
                     )), self.on_hb,
                 )
 
@@ -79,7 +81,7 @@ class Monitor(Utility, InuHandler):
                         subjects=const.Subjects.all(const.Subjects.ALERT),
                         deliver_policy=del_pol,
                         opt_start_time=start_time,
-                        ack_wait=5,
+                        ack_wait=ack_wait,
                     )), self.on_alert,
                 )
 
@@ -90,7 +92,7 @@ class Monitor(Utility, InuHandler):
                         subjects=const.Subjects.all(const.Subjects.SETTINGS),
                         deliver_policy=del_pol,
                         opt_start_time=start_time,
-                        ack_wait=5,
+                        ack_wait=ack_wait,
                     )), self.on_settings,
                 )
 
@@ -101,7 +103,7 @@ class Monitor(Utility, InuHandler):
                         subjects=const.Subjects.all(const.Subjects.COMMAND),
                         deliver_policy=del_pol,
                         opt_start_time=start_time,
-                        ack_wait=5,
+                        ack_wait=ack_wait,
                     )), self.on_command,
                 )
 
@@ -112,7 +114,7 @@ class Monitor(Utility, InuHandler):
                         subjects=const.Subjects.all(const.Subjects.LOG),
                         deliver_policy=del_pol,
                         opt_start_time=start_time,
-                        ack_wait=5,
+                        ack_wait=ack_wait,
                     )), self.on_log,
                 )
 
