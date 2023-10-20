@@ -1,8 +1,10 @@
 import argparse
 import glob
+import json
 import logging
 import os
 import tarfile
+import tempfile
 from os.path import dirname as up
 import shutil
 
@@ -56,9 +58,8 @@ class Build(Utility):
             self.logger.error(f"App files for '{device_id[0]}' do not exist")
             exit(1)
 
-        if not os.path.exists(f"{self.root_dir}/config/{device_id[0]}.json"):
-            self.logger.error(f"{device_id[0]}.json in /config/ does not exist")
-            exit(1)
+        cfg = self.create_config_file(device_id)
+        self.logger.info(f"Generated configuration:\n{cfg}")
 
         port = self.args.port
         self.state = State()
@@ -80,14 +81,13 @@ class Build(Utility):
 
         self.logger.info("Sending content..")
 
-        self.send_file(f"config/{device_id[0]}.json", "settings.json")
-        self.send_files(f"apps/{device_id[0]}")
-        self.send_files("src/inu", "inu")
-        return
-
         # Core app
         self.send_files(f"apps/{device_id[0]}")
-        self.send_file(f"config/{device_id[0]}.json", "settings.json")
+        with tempfile.NamedTemporaryFile('w') as fp:
+            fp.write(cfg)
+            fp.seek(0)
+            self.send_file(fp.name, "settings.json")
+
         self.send_files("src/inu", "inu")
         self.send_files("src/micro_nats", "micro_nats")
         self.send_files("src/wifi", "wifi")
@@ -104,6 +104,44 @@ class Build(Utility):
             mpremote.do_disconnect(self.state, MpArgs())
 
         self.logger.info("Done")
+
+    def create_config_file(self, device_id) -> str:
+        """
+        Merges all base & device config files into one and returns them as a string (containing valid JSON).
+        """
+        dvc_id_str = '.'.join(device_id)
+        files = [
+            f"{self.root_dir}/config/base.json",
+            f"{self.root_dir}/config/{device_id[0]}.json",
+        ]
+
+        fn = device_id[0]
+        for part in device_id[1:]:
+            fn += f".{part}"
+            files.append(f"{self.root_dir}/config/{fn}.json")
+
+        def merge(source, destination):
+            for key, value in source.items():
+                if isinstance(value, dict):
+                    # get node or create one
+                    node = destination.setdefault(key, {})
+                    merge(value, node)
+                else:
+                    destination[key] = value
+
+            return destination
+
+        out = {'device_id': dvc_id_str, 'hostname': '_'.join(device_id)}
+        for file in files:
+            if os.path.exists(file):
+                self.logger.info(f"Loading device info from {file}")
+                try:
+                    with open(file, 'r') as fp:
+                        merge(json.load(fp), out)
+                except Exception as e:
+                    self.logger.error(f"ERROR loading config: {type(e).__name__}: {e}")
+
+        return json.dumps(out, indent=4)
 
     def has_lib_files(self) -> bool:
         """
@@ -198,11 +236,14 @@ class Build(Utility):
 
         `dest` should be a file, and the base directory must already exist.
         """
+        if src[0] != "/":
+            src = f"{self.root_dir}/{src}"
+
         self.logger.debug(f"cp {dest}")
         if self.local_dir:
-            shutil.copy(self.root_dir + "/" + src, self.local_dir + dest)
+            shutil.copy(src, self.local_dir + dest)
         else:
-            mpremote.do_filesystem(self.state, MpArgs(command=["cp"], path=[f"{self.root_dir}/{src}", f":{dest}"]))
+            mpremote.do_filesystem(self.state, MpArgs(command=["cp"], path=[src, f":{dest}"]))
 
     async def get_libs(self, tag: str, ext: str = ".tar.gz"):
         """
