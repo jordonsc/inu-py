@@ -30,7 +30,8 @@ class IoClient:
         self.logger = logging.getLogger('mnats.io.client')
         self.read_stream = r_stream
         self.write_stream = w_stream
-        self.parser = protocol.Parser(handler)
+        self.handler = handler
+        self.parser = protocol.Parser(self.handler)
         self.pool = TaskPool()
 
         self.verbose_logging = False
@@ -46,11 +47,8 @@ class IoClient:
                 if cpy and self.read_stream.at_eof():
                     self.logger.warning("Connection terminated by remote")
                     await self.close()
+                    await self.handler.on_connection_terminated()
                     break
-
-                # TODO: MPy equiv of above?
-                # ERROR:mnats.io.client:IO fault: [Errno 113] ECONNABORTED
-                # ERROR:mnats.io.client:IO fault: [Errno 128] ENOTCONN
 
                 try:
                     line = await self.read_stream.readline()
@@ -58,10 +56,15 @@ class IoClient:
                         self.logger.debug(f"<<< {line}")
                     await self.parser.parse(line)
 
+                except ConnectionResetError:
+                    self.logger.warning(f"Connection reset")
+                    await self.close()
+                    await self.handler.on_connection_terminated()
                 except asyncio.CancelledError:
+                    await self.close()
                     break
                 except Exception as e:
-                    self.logger.error(f"IO fault: {e.__class__}: {e}")
+                    self.logger.error(f"IO fault: {type(e)}: {e}")
 
         self.pool.run(read_task())
 
@@ -69,13 +72,14 @@ class IoClient:
         """
         Drain streams and disconnect.
         """
-        if self.read_stream:
-            self.read_stream = None
+        try:
+            if self.write_stream:
+                self.logger.info("Closing connection")
+                await self.write_stream.drain()
+                self.write_stream.close()
 
-        if self.write_stream:
-            self.logger.info("Closing connection")
-            await self.write_stream.drain()
-            self.write_stream.close()
+        finally:
+            self.read_stream = None
             self.write_stream = None
 
     def is_connected(self):

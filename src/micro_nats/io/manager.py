@@ -186,7 +186,17 @@ class IoManager(protocol.MessageHandler):
         del self.callbacks[sid]
 
     async def on_connection_terminated(self):
-        await self.disconnect()
+        """
+        Called by the IO client when the connection is lost by means other than an intentional disconnect.
+        """
+        self.io = None
+        self.state = self.ConnectionState.CLOSED
+
+        if self.context.auto_reconnect:
+            self.logger.warning("Reconnecting to NATS server..")
+            await self.connect()
+        else:
+            await self.disconnect()
 
     def on_traffic(self):
         """

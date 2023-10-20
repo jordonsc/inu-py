@@ -19,6 +19,12 @@ class InuHandler:
     async def on_settings_updated(self):
         pass
 
+    async def on_connect(self, server: model.ServerInfo):
+        pass
+
+    async def on_disconnect(self):
+        pass
+
 
 class Inu(io.IoHandler):
     def __init__(self, context: const.Context, handler: InuHandler | None = None):
@@ -37,7 +43,7 @@ class Inu(io.IoHandler):
         if self.context.settings_class is not None and not issubclass(self.context.settings_class, Settings):
             raise error.BadRequest("Settings class is not a subclass of `Settings`")
 
-        self.nats = NatsClient(model.ServerContext(self.context.nats_server))
+        self.nats = NatsClient(model.ServerContext(self.context.nats_server), self)
         self.js = JsClient(self.nats)
 
     async def init(self) -> bool:
@@ -53,10 +59,6 @@ class Inu(io.IoHandler):
                 self.logger.debug("Init: NATS..")
                 await self.nats.connect()
                 await self._wait_for_nats_connect()
-
-            if self.context.settings_class is not None:
-                self.logger.debug("Init: settings..")
-                await self.init_settings()
 
             if self.context.has_heartbeat:
                 self.logger.debug("Init: heartbeat..")
@@ -212,3 +214,13 @@ class Inu(io.IoHandler):
             await self.nats.publish(const.Subjects.fqs(const.Subjects.ALERT, self.device_id), alert.marshal())
         except Exception as e:
             self.logger.error(f"Failed to publish alert: {type(e).__name__}: {str(e)}")
+
+    async def on_connect(self, server: model.ServerInfo):
+        if self.context.settings_class is not None:
+            self.logger.debug("Init: settings..")
+            await self.init_settings()
+
+        self.pool.run(self.handler.on_connect(server))
+
+    async def on_disconnect(self):
+        self.pool.run(self.handler.on_disconnect())

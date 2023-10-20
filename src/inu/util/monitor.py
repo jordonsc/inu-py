@@ -48,6 +48,15 @@ class Monitor(Utility, InuHandler):
         if not await self.inu.init():
             return
 
+        while not self.exit:
+            await asyncio.sleep(0.1)
+
+    async def on_settings_updated(self):
+        self.logger.debug("New settings received")
+
+    async def on_connect(self, server: model.ServerInfo):
+        self.logger.info("Connected to NATS server")
+
         stream_tally = 0
         ack_wait = Time.sec_to_nano(1.5)
 
@@ -131,11 +140,6 @@ class Monitor(Utility, InuHandler):
             return
 
         self.logger.info(f"Monitoring {stream_tally} stream{'s' if stream_tally > 0 else ''}..")
-        while not self.exit:
-            await asyncio.sleep(0.1)
-
-    async def on_settings_updated(self):
-        self.logger.debug("New settings received")
 
     async def handle_msg(self, msg: model.Message, msg_logic: callable):
         # Raw stream messages (eg last message) can't be ack'd
