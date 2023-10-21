@@ -20,3 +20,19 @@ class RangingSensor:
         Returns None if no measurement has been made.
         """
         pass
+
+
+class MotionSensor:
+    async def read_loop(self):
+        """
+        Starts the sensor reading loop.
+        """
+        pass
+
+    def is_motion(self) -> bool:
+        """
+        Returns the distance in mm.
+
+        Returns None if no measurement has been made.
+        """
+        pass

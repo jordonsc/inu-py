@@ -141,7 +141,7 @@ class IoManager(protocol.MessageHandler):
 
                     if self.ping_counter > self.context.max_missed_pings:
                         self.logger.error("Ping timeout")
-                        await self.disconnect()
+                        await self.on_connection_terminated()
 
             except asyncio.CancelledError:
                 pass

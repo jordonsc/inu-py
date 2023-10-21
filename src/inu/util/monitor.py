@@ -1,19 +1,18 @@
-import logging
-import asyncio
-import random
 import argparse
+import asyncio
+import logging
+import random
 
 from inu import Inu, InuHandler, tz
-from inu.error import BadRequest
-from inu.util import Utility
+from inu import error, const
 from inu.const import Context
+from inu.error import BadRequest
 from inu.schema import Alert, Log, Heartbeat
 from inu.schema.settings import Settings
-from inu import error, const
-from micro_nats.jetstream.error import ErrorResponseException
-
-from micro_nats.jetstream.protocol.consumer import Consumer, ConsumerConfig
+from inu.util import Utility
 from micro_nats import error as mn_error, model
+from micro_nats.jetstream.error import ErrorResponseException
+from micro_nats.jetstream.protocol.consumer import Consumer, ConsumerConfig
 from micro_nats.util import Time
 
 
@@ -166,7 +165,7 @@ class Monitor(Utility, InuHandler):
         def handle_log():
             device_id = msg.get_subject()[len(const.Subjects.LOG) + 1:]
             log = Log(msg.get_payload())
-            print(f"<{device_id}> [{log.level}] {log.message}")
+            print(f"{msg.time} <{device_id}> [{log.level}] {log.message}")
 
         await self.handle_msg(msg, handle_log)
 
@@ -174,7 +173,7 @@ class Monitor(Utility, InuHandler):
         def handle_alert():
             device_id = msg.get_subject()[len(const.Subjects.ALERT) + 1:]
             alert = Alert(msg.get_payload())
-            print(f"<{device_id}> [P{alert.priority}] {alert.message}")
+            print(f"{msg.time} <{device_id}> [P{alert.priority}] {alert.message}")
 
         await self.handle_msg(msg, handle_alert)
 
@@ -182,20 +181,20 @@ class Monitor(Utility, InuHandler):
         def handle_hb():
             device_id = msg.get_subject()[len(const.Subjects.HEARTBEAT) + 1:]
             hb = Heartbeat(msg.get_payload())
-            print(f"<{device_id}> BEAT ({hb.interval}s)")
+            print(f"{msg.time} <{device_id}> BEAT ({hb.interval}s)")
 
         await self.handle_msg(msg, handle_hb)
 
     async def on_settings(self, msg: model.Message):
         def handle_hb():
             device_id = msg.get_subject()[len(const.Subjects.SETTINGS) + 1:]
-            print(f"<{device_id}> NEW SETTINGS :: {msg.get_payload().decode()}")
+            print(f"{msg.time} <{device_id}> NEW SETTINGS :: {msg.get_payload().decode()}")
 
         await self.handle_msg(msg, handle_hb)
 
     async def on_command(self, msg: model.Message):
         def handle_hb():
             device_id = msg.get_subject()[len(const.Subjects.COMMAND) + 1:]
-            print(f"<{device_id}> CMD :: {msg.get_payload().decode()}")
+            print(f"{msg.time} <{device_id}> CMD :: {msg.get_payload().decode()}")
 
         await self.handle_msg(msg, handle_hb)

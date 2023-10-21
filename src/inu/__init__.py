@@ -114,9 +114,10 @@ class Inu(io.IoHandler):
     async def _on_settings(self, msg: model.Message):
         try:
             self.settings = self.context.settings_class(msg.get_payload())
+            if self.has_settings:
+                await self.log("Applied new settings")
             self.has_settings = True
             await self.js.msg.ack(msg)
-            await self.log("Applied new settings")
         except Exception as e:
             await self.js.msg.nack(msg)
             await self.log(f"Error applying new settings: {type(e).__name__}: {e}")

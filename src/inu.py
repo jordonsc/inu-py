@@ -63,6 +63,8 @@ build_parser.add_argument('-p', '--port', dest="port", action='store', help="Dev
                           default="/dev/ttyACM0")
 build_parser.add_argument('-l', '--local', dest="local", action='store_true',
                           help="build to the local `build/` directory instead of a remote device; overrides -p")
+build_parser.add_argument('-s', '--settings', dest="settings", action='store_true',
+                          help="only apply new settings to the device")
 
 
 def safe_exit():

@@ -88,6 +88,10 @@ class Build(Utility):
             fp.seek(0)
             self.send_file(fp.name, "settings.json")
 
+        if self.args.settings:
+            self.logger.info("New settings applied")
+            return
+
         self.send_files("src/inu", "inu")
         self.send_files("src/micro_nats", "micro_nats")
         self.send_files("src/wifi", "wifi")
