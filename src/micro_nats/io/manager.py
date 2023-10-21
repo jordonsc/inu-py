@@ -61,6 +61,7 @@ class IoManager(protocol.MessageHandler):
         self.pool = TaskPool()
 
         self.verbose_cmd_logging = False
+        self.has_chaos = True  # set to false to have simulated disconnects every 15 seconds
 
     async def connect(self):
         """
@@ -73,21 +74,61 @@ class IoManager(protocol.MessageHandler):
 
         server = uri.parse_server(self.context.get_server(cycle=True))
 
-        try:
-            self.logger.info(f"Opening connection to {server.address}:{server.port}..")
-            self.io = IoClient(*await asyncio.wait_for(
-                asyncio.open_connection(server.address, server.port),
-                self.context.connect_timeout
-            ), handler=self)
+        while True:
+            try:
+                self.logger.info(f"Opening connection to {server.address}:{server.port}..")
+                self.io = IoClient(*await asyncio.wait_for(
+                    asyncio.open_connection(server.address, server.port),
+                    self.context.connect_timeout
+                ), msg_handler=self, on_disconnect=self.on_connection_reset)
 
-            self.state = self.ConnectionState.HANDSHAKE
-            self.logger.debug("NATS connection established")
+                self.state = self.ConnectionState.HANDSHAKE
+                self.logger.debug("NATS connection established")
 
-        except asyncio.TimeoutError as e:
-            raise error.NetworkTimeout(e)
+                if not self.has_chaos:
+                    async def chaos():
+                        last_kill = time.time()
+                        while True:
+                            if not self.io.is_connected():
+                                last_kill = time.time()
+                            elif time.time() - last_kill >= 15:
+                                self.logger.warning("Chaos kill")
+                                await self.on_connection_reset()
+                                last_kill = time.time()
 
-        except ConnectionRefusedError as e:
-            raise error.ConnectionRefused(e)
+                            await asyncio.sleep(1)
+
+                    self.logger.warning("Starting chaos daemon")
+                    self.pool.run(chaos())
+                    self.has_chaos = True
+
+                break
+
+            except asyncio.TimeoutError:
+                if self.context.auto_reconnect:
+                    self.logger.error("Connection refused")
+                else:
+                    raise error.NetworkTimeout()
+
+            except ConnectionRefusedError:
+                if self.context.auto_reconnect:
+                    self.logger.error("Connection refused")
+                else:
+                    raise error.ConnectionRefused()
+
+            await asyncio.sleep(self.context.reconnect_delay)
+
+    async def on_connection_reset(self):
+        """
+        ClientIO disconnect or ping timeout.
+
+        IMPORTANT: call disconnect() to fire disconnect callbacks which will clean up consumers.
+        If permitted, the connection will be reconnected and the connect() callback will recreate consumers.
+        """
+        await self.disconnect()
+
+        if self.context.auto_reconnect:
+            await self.connect()
 
     async def handshake(self):
         """
@@ -135,18 +176,18 @@ class IoManager(protocol.MessageHandler):
 
                     if time.time() - self.ping_timer > self.context.ping_interval:
                         self.ping_counter += 1
-                        await self.io.write(c_cmd.Ping().marshal(), flush=True)
+                        await self.safe_write(c_cmd.Ping().marshal(), flush=True)
                         self.ping_timer = time.time()
                         continue
 
                     if self.ping_counter > self.context.max_missed_pings:
                         self.logger.error("Ping timeout")
-                        await self.on_connection_terminated()
+                        await self.on_connection_reset()
 
             except asyncio.CancelledError:
-                pass
+                self.logger.debug("Pinger cancelled")
 
-        self.pool.run(ping_task())
+        self.ping_task = asyncio.create_task(ping_task())
 
         # All wrapped up - exec connect callback
         self.pool.run(self.handler.on_connect(server=self.server_info))
@@ -155,6 +196,10 @@ class IoManager(protocol.MessageHandler):
         """
         Drain streams and disconnect.
         """
+        if self.ping_task:
+            self.ping_task.cancel()
+            await asyncio.sleep(0)
+            self.ping_task = None
 
         if self.io:
             self.state = self.ConnectionState.CLOSING
@@ -184,19 +229,6 @@ class IoManager(protocol.MessageHandler):
             raise error.NotFoundError(f"SID {sid} does not have a registered callback")
 
         del self.callbacks[sid]
-
-    async def on_connection_terminated(self):
-        """
-        Called by the IO client when the connection is lost by means other than an intentional disconnect.
-        """
-        self.io = None
-        self.state = self.ConnectionState.CLOSED
-
-        if self.context.auto_reconnect:
-            self.logger.warning("Reconnecting to NATS server..")
-            await self.connect()
-        else:
-            await self.disconnect()
 
     def on_traffic(self):
         """
@@ -230,7 +262,7 @@ class IoManager(protocol.MessageHandler):
     async def on_ping(self, ping: s_cmd.Ping):
         await super().on_ping(ping)
         self.on_traffic()
-        self.pool.run(self.io.write(c_cmd.Pong().marshal()))
+        self.pool.run(self.safe_write(c_cmd.Pong().marshal()))
 
     async def on_pong(self, pong: s_cmd.Pong):
         await super().on_pong(pong)
@@ -250,3 +282,37 @@ class IoManager(protocol.MessageHandler):
 
         if hmsg.get_sid() in self.callbacks:
             await self.callbacks[hmsg.get_sid()](model.Message(hmsg))
+
+    async def safe_send(self, payload: c_cmd.ClientCommand, flush=True, wait=False, timeout: float = 5,
+                        retries: int = 5):
+        """
+        Attempts to send a command, retrying or waiting for a connection if it was not available at the immediate
+        time of the call.
+        """
+        if wait:
+            await self.safe_write(payload.marshal(), flush=flush, timeout=timeout, retries=retries)
+        else:
+            self.pool.run(self.safe_write(payload.marshal(), flush=flush, timeout=timeout, retries=retries))
+
+    async def safe_write(self, payload: bytes, flush=True, timeout: float = 5, retries: int = 5):
+        """
+        Attempts to write raw data, retrying or waiting for a connection if it was not available at the immediate
+        time of the call.
+        """
+        attempts = 0
+        while attempts < retries:
+            try:
+                start_time = time.time()
+                while self.state != self.ConnectionState.CONNECTED:
+                    if time.time() - start_time > timeout:
+                        raise error.NoConnectionError()
+
+                    await asyncio.sleep(0.001)
+
+                await self.io.write(payload, flush=flush)
+                return
+
+            except ConnectionResetError | error.NoConnectionError:
+                pass
+
+            attempts += 1

@@ -1,4 +1,6 @@
+import asyncio
 import logging
+import time
 
 from . import model, error
 from .io.manager import IoManager, IoHandler, SubManager
@@ -62,7 +64,7 @@ class Client:
 
         If `wait` is set to True, this function will block until the stream is flushed.
         """
-        await self.manager.io.send(c_cmd.Pub(subject=subject, payload=payload, reply_to=reply_to), wait=wait)
+        await self.manager.safe_send(c_cmd.Pub(subject=subject, payload=payload, reply_to=reply_to), wait=wait)
 
     async def subscribe(self, subject: str | bytes, cb: callable, queue_grp: str | bytes | None = None) -> str:
         """
@@ -72,7 +74,7 @@ class Client:
             async cb(model.Message) -> None
         """
         sub_id = self.sub_mgr.generate_core_sub_id()
-        await self.manager.io.send(c_cmd.Sub(subject=subject, queue_grp=queue_grp, sid=sub_id))
+        await self.manager.safe_send(c_cmd.Sub(subject=subject, queue_grp=queue_grp, sid=sub_id))
         self.manager.bind_callback(sub_id, callback=cb)
         return sub_id
 
@@ -90,4 +92,5 @@ class Client:
             except error.NotFoundError:
                 pass
 
-        await self.manager.io.send(c_cmd.Unsub(sid=sid, max_messages=max_messages))
+        if self.is_connected():
+            await self.manager.safe_send(c_cmd.Unsub(sid=sid, max_messages=max_messages))

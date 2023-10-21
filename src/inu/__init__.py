@@ -34,6 +34,7 @@ class Inu(io.IoHandler):
         self.handler = handler
         self.pool = TaskPool()
         self.has_settings = False
+        self.hb_task = None
 
         if isinstance(self.context.device_id, list):
             self.device_id = ".".join(self.context.device_id)
@@ -60,11 +61,6 @@ class Inu(io.IoHandler):
                 await self.nats.connect()
                 await self._wait_for_nats_connect()
 
-            if self.context.has_heartbeat:
-                self.logger.debug("Init: heartbeat..")
-                await self.init_heartbeat()
-
-            self.logger.debug("Init complete")
             return True
 
         except error.NoConnection:
@@ -136,7 +132,7 @@ class Inu(io.IoHandler):
             self.settings.heartbeat_interval = 5
 
         self.logger.debug(f"Beginning heartbeat, interval {self.settings.heartbeat_interval}")
-        self.pool.run(self._run_heartbeat())
+        self.hb_task = asyncio.create_task(self._run_heartbeat())
 
     async def _run_heartbeat(self):
         last_beat = 0
@@ -165,6 +161,11 @@ class Inu(io.IoHandler):
 
         except asyncio.CancelledError:
             self.logger.debug(f"Heartbeat dying")
+
+    async def _kill_heartbeat(self):
+        if self.hb_task:
+            self.hb_task.cancel()
+            self.hb_task = None
 
     async def command(self, sub_cmd: str, data: dict = None):
         """
@@ -221,7 +222,15 @@ class Inu(io.IoHandler):
             self.logger.debug("Init: settings..")
             await self.init_settings()
 
+        if self.context.has_heartbeat:
+            self.logger.debug("Init: heartbeat..")
+            await self.init_heartbeat()
+
+        self.logger.info("Connected")
         self.pool.run(self.handler.on_connect(server))
 
     async def on_disconnect(self):
+        await self.js.flush_inbox()
+        await self._kill_heartbeat()
+        self.has_settings = False
         self.pool.run(self.handler.on_disconnect())

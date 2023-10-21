@@ -42,9 +42,6 @@ class MessageHandler:
                 f"{hmsg.get_payload().decode()}"
             )
 
-    async def on_connection_terminated(self):
-        pass
-
 
 class Parser:
     MSG_CLASSES = [s_cmd.Message, s_cmd.HeaderMessage, s_cmd.OK, s_cmd.Error, s_cmd.Info, s_cmd.Ping, s_cmd.Pong]
@@ -134,4 +131,3 @@ class Parser:
             self.logger.error(f"Unimplemented command message: {command.__class__}")
 
         await asyncio.sleep(0)
-

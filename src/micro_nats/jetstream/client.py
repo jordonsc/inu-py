@@ -24,6 +24,14 @@ class Client(SubManager):
         self.consumer = ConsumerManager(self.manager)
         self.msg = MessageManager(self.manager)
 
+    async def flush_inbox(self):
+        """
+        Flushes the inbox of all push listeners.
+
+        Call this if you've disconnected/reconnected the NATS server, or have flushed your consumers.
+        """
+        await self.manager.inbox_mgr.flush()
+
     def set_io_timeout(self, timeout: float):
         """
         Set the timeout for standard request-response transactions.

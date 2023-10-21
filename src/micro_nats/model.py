@@ -71,6 +71,7 @@ class ServerContext(Model):
         self.shuffle_servers: bool = True
 
         self.connect_timeout: float = 5.0
+        self.reconnect_delay: float = 1.0
         self.auto_reconnect: bool = True
 
         self.ping_interval: float = 15.0

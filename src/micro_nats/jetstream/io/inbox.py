@@ -39,6 +39,16 @@ class InboxManager:
     def num_stowed_boxes(self) -> int:
         return len(self.stowed_boxes)
 
+    async def flush(self):
+        """
+        Clears the inbox and kills all consumers.
+        """
+        for box in self.stowed_boxes:
+            await self._destroy_inbox(box)
+
+        for box in self.active_boxes:
+            await self._destroy_inbox(box)
+
     async def get_inbox(self, callback: callable, force_new: bool = False) -> str:
         """
         Returns an inbox, a stowed inbox if one exists, else it will generate a new one and return.
@@ -106,9 +116,6 @@ class InboxManager:
         """
         Unsubscribes to the inbox and destroys the token reference.
         """
-        if not self.client.is_connected():
-            raise error.NoConnectionError()
-
         if inbox in self.active_boxes:
             self.active_boxes.remove(inbox)
 

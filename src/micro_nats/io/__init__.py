@@ -24,14 +24,14 @@ class IoClient:
     """
 
     def __init__(self, r_stream: asyncio.StreamReader, w_stream: asyncio.StreamWriter,
-                 handler: protocol.MessageHandler):
+                 msg_handler: protocol.MessageHandler, on_disconnect: callable):
         super().__init__()
 
         self.logger = logging.getLogger('mnats.io.client')
         self.read_stream = r_stream
         self.write_stream = w_stream
-        self.handler = handler
-        self.parser = protocol.Parser(self.handler)
+        self.parser = protocol.Parser(msg_handler)
+        self.on_disconnect = on_disconnect
         self.pool = TaskPool()
 
         self.verbose_logging = False
@@ -47,7 +47,7 @@ class IoClient:
                 if cpy and self.read_stream.at_eof():
                     self.logger.warning("Connection terminated by remote")
                     await self.close()
-                    await self.handler.on_connection_terminated()
+                    self.pool.run(self.on_disconnect())
                     break
 
                 try:
@@ -57,12 +57,14 @@ class IoClient:
                     await self.parser.parse(line)
 
                 except ConnectionResetError:
-                    self.logger.warning(f"Connection reset")
+                    self.logger.warning(f"Connection reset (read)")
                     await self.close()
-                    await self.handler.on_connection_terminated()
+                    self.pool.run(self.on_disconnect())
+
                 except asyncio.CancelledError:
                     await self.close()
                     break
+
                 except Exception as e:
                     self.logger.error(f"IO fault: {type(e)}: {e}")
 
@@ -77,6 +79,13 @@ class IoClient:
                 self.logger.info("Closing connection")
                 await self.write_stream.drain()
                 self.write_stream.close()
+
+        except ConnectionResetError:
+            # Can happen if you called `close()` to clean things up during a disconnect
+            pass
+
+        except Exception as e:
+            self.logger.warning(f"Error trying to close stream: {type(e)}: {e}")
 
         finally:
             self.read_stream = None
@@ -123,6 +132,9 @@ class IoClient:
     async def write(self, data: bytes, flush: bool = True):
         """
         Write raw data to the server stream.
+
+        If not connected, will wait until `timeout` for the connection to come alive before throwing a
+        `NoConnectionError` exception.
         """
         if not self.is_connected():
             raise error.NoConnectionError()
