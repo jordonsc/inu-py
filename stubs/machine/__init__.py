@@ -255,3 +255,120 @@ class Pin:
     IRQ_RISING = 1  # Trigger on rising edge
     IRQ_FALLING = 2  # Trigger on falling edge
     IRQ_BOTH = 3  # Trigger on both rising and falling edges
+
+
+class Timer:
+    """
+    Class for creating and controlling timers.
+    """
+    PERIODIC = 0
+    ONE_SHOT = 1
+
+    def __init__(self, id: int):
+        """
+        Construct a Timer object.
+
+        :param int id: Timer ID (0, 1, 2, etc.).
+        """
+        pass
+
+    def init(self, mode=0, callback=None, period=0, freq=0):
+        """
+        Initialize the timer.
+
+        :param int mode: (Optional) Timer mode (0 for period, 1 for one-shot).
+        :param callable callback: (Optional) Callback function to be executed on timer overflow.
+        :param int period: (Optional) Timer period in milliseconds.
+        :param int freq: (Optional) Timer frequency in Hz.
+        """
+        pass
+
+    def deinit(self):
+        """
+        Deinitialize the timer, releasing any resources associated with it.
+        """
+        pass
+
+    def value(self):
+        """
+        Get the current value of the timer.
+
+        :return: Current timer value.
+        :rtype: int
+        """
+        pass
+
+    def start(self, us=-1):
+        """
+        Start the timer.
+
+        :param int us: (Optional) Time delay in microseconds before starting the timer.
+        """
+        pass
+
+    def stop(self):
+        """
+        Stop the timer.
+        """
+        pass
+
+    def callback(self, callback=None):
+        """
+        Get or set the callback function.
+
+        :param callable callback: (Optional) Callback function to be executed on timer overflow.
+        :return: Current callback function.
+        :rtype: callable
+        """
+        pass
+
+
+class PWM:
+    """
+    Class for controlling PWM (Pulse Width Modulation) outputs.
+    """
+
+    def __init__(self, pin, freq=1000, duty=512):
+        """
+        Initialize a PWM object.
+
+        :param machine.Pin pin: Pin object to which PWM is assigned.
+        :param int freq: (Optional) Frequency of the PWM signal in Hz (default is 1000).
+        :param int duty: (Optional) Initial duty cycle (default is 512).
+        """
+        pass
+
+    def init(self, freq=1000, duty=512):
+        """
+        Initialize the PWM.
+
+        :param int freq: (Optional) Frequency of the PWM signal in Hz (default is 1000).
+        :param int duty: (Optional) Initial duty cycle (default is 512).
+        """
+        pass
+
+    def deinit(self):
+        """
+        Deinitialize the PWM, releasing any resources associated with it.
+        """
+        pass
+
+    def freq(self, freq=None):
+        """
+        Get or set the frequency of the PWM signal.
+
+        :param int freq: (Optional) Frequency in Hz.
+        :return: Current frequency.
+        :rtype: int
+        """
+        pass
+
+    def duty(self, duty=None):
+        """
+        Get or set the duty cycle of the PWM signal.
+
+        :param int duty: (Optional) Duty cycle (0 to 1023).
+        :return: Current duty cycle.
+        :rtype: int
+        """
+        pass

@@ -8,12 +8,6 @@ from ..protocol.cmd import server as s_cmd, client as c_cmd
 from ..util import uri
 from ..util.asynchronous import TaskPool
 
-try:
-    # ConnectionRefusedError missing on MicroPython
-    ConnectionRefusedError
-except NameError:
-    ConnectionRefusedError = OSError
-
 
 class SubManager:
     """
@@ -110,7 +104,7 @@ class IoManager(protocol.MessageHandler):
                 else:
                     raise error.NetworkTimeout()
 
-            except ConnectionRefusedError:
+            except OSError:
                 if self.context.auto_reconnect:
                     self.logger.error("Connection refused")
                 else:
