@@ -35,18 +35,13 @@ class Relay(Settings, ActionDevice):
     """
     ## An on-off or timer based power relay.
 
-    If `auto_off` is set, the device will automatically turn itself back off after `time_delay` seconds.
-
-    If `allow_toggle` is set, the device will act as a toggle and can be turned off by a second trigger command.
+    Will either toggle, time-delay activate or power on/off a relay depending on the trigger code sent:
+     0: Will toggle if `time_delay` is zero, or time-delay activate if non-zero
+     1: Activate the relay
+     2: Deactivate the relay
     """
-    auto_off: bool = False
-    auto_off_hint: str = "Automatically turn the switch off after `time_delay` seconds"
-
-    allow_toggle: bool = False
-    allow_toggle_hint: str = "Triggers will either turn the device on or off, based on the current state."
-
     time_delay: int = 30
-    time_delay_hint: str = "Time to switch the device off after triggering in seconds"
+    time_delay_hint: str = "Auto-off time in seconds; if 0, device will be in pure toggle mode"
     time_delay_min: int = 0
 
 

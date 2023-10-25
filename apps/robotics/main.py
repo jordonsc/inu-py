@@ -32,7 +32,7 @@ class RoboticsApp(InuApp):
 
         while True:
             await self.on_loop()
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.01)
 
 
 if __name__ == "__main__":

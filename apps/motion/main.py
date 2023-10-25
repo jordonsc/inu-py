@@ -4,7 +4,7 @@ import time
 from inu import const
 from inu.app import InuApp
 from inu.hardware.pir import Pir
-from inu.schema.settings.sensors import RangeTrigger
+from inu.schema.settings.sensors import MotionSensor
 from micro_nats.util.asynchronous import TaskPool
 
 
@@ -17,7 +17,7 @@ class MotionApp(InuApp):
         COOLDOWN = 2  # Sensor did fire, is in a cooling off period before allowing another trigger
 
     def __init__(self):
-        super().__init__(RangeTrigger)
+        super().__init__(MotionSensor)
         self.pool = TaskPool()
         self.motion_type = self.get_config(["motion", "type"])
 
@@ -46,7 +46,7 @@ class MotionApp(InuApp):
 
         while True:
             await self.on_loop()
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.01)
 
             motion = self.sensor.is_motion()
 

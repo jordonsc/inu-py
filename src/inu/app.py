@@ -3,6 +3,9 @@ import json
 import logging
 
 from inu import InuHandler, Inu, const
+from micro_nats import model
+from micro_nats.jetstream.protocol import consumer
+from micro_nats.util import Time
 from wifi import Wifi, error as wifi_err
 
 
@@ -127,5 +130,45 @@ class InuApp(InuHandler):
     async def on_settings_updated(self):
         """
         Settings updated. Override to update anything with new settings.
+
+        IMPORTANT: be sure to call super() as this will subscribe to listen-devices.
+        """
+        if not hasattr(self.inu.settings, 'listen_subjects'):
+            return
+
+        async def on_subject_trigger(msg: model.Message):
+            await self.inu.js.msg.ack(msg)
+
+            try:
+                data = json.loads(msg.get_payload())
+                code = int(data['code'])
+            except Exception as e:
+                self.logger.warning(f"Malformed trigger payload: {type(e)}: {e}")
+                code = 0
+
+            self.logger.info(f"Trigger from {msg.subject}: code {code}")
+            await self.on_trigger(code)
+
+        subjects = self.inu.settings.listen_subjects.split(" ")
+
+        # FIXME: flush old consumers first
+        for subject in subjects:
+            await self.inu.js.consumer.create(
+                consumer.Consumer(
+                    const.Streams.COMMAND,
+                    consumer_cfg=consumer.ConsumerConfig(
+                        filter_subject=const.Subjects.fqs(
+                            [const.Subjects.COMMAND, const.Subjects.COMMAND_TRIGGER],
+                            subject
+                        ),
+                        deliver_policy=consumer.ConsumerConfig.DeliverPolicy.NEW,
+                        ack_wait=Time.sec_to_nano(3),
+                    )
+                ), push_callback=on_subject_trigger,
+            )
+
+    async def on_trigger(self, code: int):
+        """
+        Called when a listen-device publishes a `trigger` message.
         """
         pass
