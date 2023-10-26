@@ -1,13 +1,18 @@
 from micro_nats.jetstream import protocol
-from micro_nats.jetstream.io.manager import SubManager
+from micro_nats.jetstream.io.manager import SubManager, JetstreamManager
 from micro_nats.jetstream.protocol import consumer
 
 
 class ConsumerManager(SubManager):
+    def __init__(self, js_mgr: JetstreamManager):
+        super().__init__(js_mgr)
+        self.consumer_map = {}
+
     async def info(self, stream_name: str, consumer_name: str, on_done: callable = None) -> consumer.ConsumerInfo:
         """
         Returns details on a consumer.
         """
+
         async def fn():
             return protocol.from_msg(await self.manager.request(
                 protocol.API.get(protocol.API.CONSUMER_INFO, stream=stream_name, consumer=consumer_name),
@@ -20,6 +25,7 @@ class ConsumerManager(SubManager):
         """
         Provides a list of consumers.
         """
+
         async def fn():
             payload = {'offset': offset}
 
@@ -44,6 +50,7 @@ class ConsumerManager(SubManager):
         """
         Provides a list of consumer names.
         """
+
         async def fn():
             payload = {'offset': offset}
 
@@ -72,9 +79,11 @@ class ConsumerManager(SubManager):
         If you don't provide a `push_callback`, you may use the consumer in pull mode by calling `fetch()`. If a
         durable pull consumer already exists, you don't need to call this before using `fetch()`.
         """
+
         async def fn():
             self.manager.ensure_connected()
 
+            inbox = None
             if push_callback:
                 # The difference between a push and a pull consumer is that a push subscriber provides an inbox
                 # via the `reply_to` property. If none is provided, you're expected to hit the `next_msg` API.
@@ -94,9 +103,14 @@ class ConsumerManager(SubManager):
                 api = protocol.API.get(protocol.API.CONSUMER_CREATE_EPHEMERAL, stream=cons.stream_name)
 
             request = consumer.ConsumerInfo(stream_name=cons.stream_name, config=cons.consumer_cfg)
-            return protocol.from_msg(
+            create_consumer: consumer.ConsumerCreateResponse = protocol.from_msg(
                 await self.manager.request(api=api, payload=request.to_json(), timeout=self.manager.io_timeout)
             )
+
+            if inbox is not None:
+                self.consumer_map[create_consumer.name] = inbox
+
+            return create_consumer
 
         return await self._run_or_await(fn, on_done)
 
@@ -105,7 +119,12 @@ class ConsumerManager(SubManager):
         """
         Deletes a consumer.
         """
+
         async def fn():
+            if consumer_name in self.consumer_map:
+                self.manager.inbox_mgr.free_inbox(self.consumer_map[consumer_name], destroy=True)
+                del self.consumer_map[consumer_name]
+
             return protocol.from_msg(await self.manager.request(
                 protocol.API.get(protocol.API.CONSUMER_DELETE, stream=stream_name, consumer=consumer_name),
                 timeout=self.manager.io_timeout

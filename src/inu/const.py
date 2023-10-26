@@ -67,7 +67,7 @@ class Subjects:
     ALERT = 'alert'
 
     # Status updates, such as begin, end, etc
-    # {'active': bool, 'status': str}
+    # {'enabled': bool, 'active': bool, 'status': str}
     STATUS = 'status'
 
     # Commands require action from other devices, such as a trigger

@@ -56,7 +56,7 @@ class IoClient:
                         self.logger.debug(f"<<< {line}")
                     await self.parser.parse(line)
 
-                except ConnectionResetError:
+                except OSError:
                     self.logger.warning(f"Connection reset (read)")
                     await self.close()
                     self.pool.run(self.on_disconnect())
@@ -80,7 +80,7 @@ class IoClient:
                 await self.write_stream.drain()
                 self.write_stream.close()
 
-        except ConnectionResetError:
+        except OSError:
             # Can happen if you called `close()` to clean things up during a disconnect
             pass
 

@@ -23,18 +23,13 @@ class RoboticsApp(InuApp):
             ),
         )
 
-    async def main_loop(self):
-        """
-        Endless app loop.
-        """
-        await self.init()
+    async def app_init(self):
         self.logger.info(f"Lead screw: {self.stepper.screw}")
 
-        while True:
-            await self.on_loop()
-            await asyncio.sleep(0.01)
+    async def app_tick(self):
+        pass
 
 
 if __name__ == "__main__":
     app = RoboticsApp()
-    asyncio.run(app.main_loop())
+    asyncio.run(app.run())

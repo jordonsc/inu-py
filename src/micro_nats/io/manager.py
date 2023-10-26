@@ -132,7 +132,7 @@ class IoManager(protocol.MessageHandler):
         This will do nothing outside of the HANDSHAKE phase, and must have a hydrated ServerInfo object first.
         """
         if self.state != self.ConnectionState.HANDSHAKE or self.server_info is None:
-            raise error.MicroNatsError("Cannot handshake at this point")
+            raise error.MicroNatsError(f"Cannot handshake at this point: state: {self.state}; server_info: {self.server_info}")
 
         connect = c_cmd.Connect(
             verbose=False,
@@ -306,7 +306,9 @@ class IoManager(protocol.MessageHandler):
                 await self.io.write(payload, flush=flush)
                 return
 
-            except ConnectionResetError | error.NoConnectionError:
+            except OSError:
+                pass
+            except error.NoConnectionError:
                 pass
 
             attempts += 1

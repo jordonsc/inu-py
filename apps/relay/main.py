@@ -21,14 +21,14 @@ class RelayApp(InuApp):
 
         self.relay.off()
 
-    async def main_loop(self):
+    async def run(self):
         """
         Endless app loop.
         """
         await self.init()
 
         while True:
-            await self.on_loop()
+            await self.app_tick()
             await asyncio.sleep(0.01)
 
             if self.trigger_start is not None and (
@@ -60,10 +60,9 @@ class RelayApp(InuApp):
             self.logger.warning(f"Ignoring trigger with code {code}")
 
     async def on_state_change(self, active: bool):
-        # TODO: publish device state
-        self.logger.info(f"Device state: {'ON' if active else 'OFF'}")
+        await self.inu.status(enabled=True, active=active, status='ON' if active else 'OFF')
 
 
 if __name__ == "__main__":
     app = RelayApp()
-    asyncio.run(app.main_loop())
+    asyncio.run(app.run())

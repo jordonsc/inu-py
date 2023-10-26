@@ -5,22 +5,29 @@ class Robotics(Settings, ActionDevice, CooldownDevice):
     """
     ## A collection of 1 or more actuators, steppers or servos that control a robotic action.
 
-    Control codes:
-     Ax[:y]  select actuator x [and set speed to y mm/m]
-     Sx[:y]  select server x
-     Mx[:y]  select motor x
-     Mx      move x mm
-     Wx      wait x milliseconds
+    **Control Codes**
+        ```
+        SEL <DEVICE ID>               Select a device
+        MV <DISTANCE> <SPEED> [INT]   Move DISTANCE mm, at speed of SPEED mm/s
+        W <TIME> [INT]                Pause for TIME milliseconds
+        ```
+
+    If "INT" is appended to the command, it will allow a break signal to reset the operation. For a wait command this
+    would reset the timer. For a move command, it would reverse the action, pause and then resume.
+
+    The default INT 'pause' time is 1000ms. Currently this is non-configurable.
+
+    A break signal is provided by sending a TRIGGER with `code` 100.
 
     Example:
-        A0:5000; M500; W2000; M-500
+        SEL A0; MV 800 300; W 2000 INT; MV -800 150 INT
 
-        Selects 'actuator 0', and sets speed to 5000 mm/m
-        Move (actuator 0) 500 mm
+        Selects device "A0"
+        Move actuator 800 mm at 300 mm/s
         Wait 2 seconds
-        Move in reverse direction 500 mm (to original state)
+        Move in reverse direction 800 mm at 150 mm/s
     """
-    seq_0: str = "A0:5000; M500; W2000; M-500"
+    seq_0: str = "SEL A0; MV 800 300; W 2000; MV -800 150"
     seq_0_hint: str = "Sequence 0 control codes"
 
     seq_1: str = ""

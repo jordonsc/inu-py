@@ -28,7 +28,7 @@ class MotionApp(InuApp):
         else:
             raise NotImplemented(f"Motion sensor type '{self.motion_type}' not supported")
 
-    async def main_loop(self):
+    async def run(self):
         """
         Endless app loop.
         """
@@ -45,7 +45,7 @@ class MotionApp(InuApp):
             state_changed = time.time()
 
         while True:
-            await self.on_loop()
+            await self.app_tick()
             await asyncio.sleep(0.01)
 
             motion = self.sensor.is_motion()
@@ -53,12 +53,14 @@ class MotionApp(InuApp):
             if state == self.SensorState.IDLE:
                 # Idle, can trigger
                 if motion:
-                    set_state(self.SensorState.ACTIVE)
+                    self.inu.status(enabled=True, active=True)
+                    await self.inu.set_state(self.SensorState.ACTIVE)
                     await self.fire()
 
             elif state == self.SensorState.ACTIVE:
                 # Sensor must return to normal before allowing it to return to idle state
                 if not motion:
+                    await self.inu.status(enabled=True, active=False)
                     set_state(self.SensorState.COOLDOWN)
 
             elif state == self.SensorState.COOLDOWN:
@@ -75,4 +77,4 @@ class MotionApp(InuApp):
 
 if __name__ == "__main__":
     app = MotionApp()
-    asyncio.run(app.main_loop())
+    asyncio.run(app.run())

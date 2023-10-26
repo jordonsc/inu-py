@@ -6,4 +6,4 @@ class Command(Schema):
 
 
 class Trigger(Command):
-    pass
+    code: int = None

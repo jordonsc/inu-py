@@ -73,6 +73,7 @@ class Wifi:
             return
 
         self.logger.info(f"Connecting to {self.ssid}..")
+        self.station.disconnect()
         self.station.connect(self.ssid, self.password)
 
     def disconnect(self):

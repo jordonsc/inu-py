@@ -13,6 +13,7 @@ from micro_nats.util.asynchronous import TaskPool
 from . import schema, error, const
 from .schema import Heartbeat
 from .schema.settings import Settings
+from .schema.status import Status
 
 
 class InuHandler:
@@ -182,6 +183,21 @@ class Inu(io.IoHandler):
         except Exception as e:
             self.logger.error(f"Command error: {type(e).__name__}: {str(e)}")
 
+    async def status(self, enabled: bool, active: bool, status: str = ""):
+        """
+        Publish the current device state.
+        """
+        payload = Status(enabled=enabled, active=active, status=status)
+        self.logger.debug(f"Device state: {payload}")
+
+        try:
+            await self.nats.publish(
+                const.Subjects.fqs(const.Subjects.STATUS, self.device_id),
+                json.dumps(payload.marshal())
+            )
+        except Exception as e:
+            self.logger.error(f"Status error: {type(e).__name__}: {str(e)}")
+
     async def log(self, message: str, level: str = const.LogLevel.INFO):
         """
         Dispatch a log message on the device's log subject.
@@ -226,7 +242,7 @@ class Inu(io.IoHandler):
             self.logger.debug("Init: heartbeat..")
             await self.init_heartbeat()
 
-        self.logger.info("Connected")
+        self.logger.info(f"Connected to NATS server: {server}")
         self.pool.run(self.handler.on_connect(server))
 
     async def on_disconnect(self):

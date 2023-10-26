@@ -1,3 +1,10 @@
+def reset():
+    """
+    Hard reset. The same as performing a power cycle to the board.
+    """
+    pass
+
+
 class UART:
     def __init__(self, uart_id, baudrate=9600, bits=8, parity=None, stop=1, tx=None, rx=None, timeout=0,
                  timeout_char=1):

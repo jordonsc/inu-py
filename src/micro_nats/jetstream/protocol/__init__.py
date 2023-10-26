@@ -47,7 +47,7 @@ class ErrorResponse(Model):
         return f"<error {self.code}/{self.err_code}; {self.description}>"
 
 
-def from_msg(msg: Message) -> Model:
+def from_msg(msg: Message):
     """
     Return a Model object matching the payload in `msg`.
 
