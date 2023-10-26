@@ -1,13 +1,34 @@
 import argparse
 import logging
 import random
+import time
 
 from textual import widgets, containers, events, validation, on
 from textual.app import App, ComposeResult
 
 from inu import Inu, InuHandler, const
-from inu.schema import settings
-from micro_nats import error as mn_error
+from inu.schema import settings, Heartbeat
+from micro_nats import error as mn_error, model
+from micro_nats.jetstream.protocol.consumer import Consumer, ConsumerConfig
+from micro_nats.util import Time
+
+
+class InfoWidget(widgets.Static):
+
+    def compose(self) -> ComposeResult:
+        stat = widgets.Static(classes="info_sub")
+        stat.mount(widgets.Static(f"Status", classes="setting_title"))
+        stat.mount(widgets.Checkbox("Enabled", True, disabled=True, id="stat_enabled"))
+        stat.mount(widgets.Checkbox("Active", disabled=True, id="stat_active"))
+        yield stat
+
+        hb = widgets.Static(classes="info_sub")
+        hb.mount(widgets.Static(f"Heartbeat", classes="setting_title"))
+        hb.mount(containers.Horizontal(
+            widgets.Static(f" :heart: ", id="hb_heart"),
+            widgets.Rule(id="hb_progress", line_style="heavy")
+        ))
+        yield hb
 
 
 class SettingsWidget(widgets.Static):
@@ -59,6 +80,7 @@ class Settings(InuHandler, App):
         ("w", "apply", "write settings"),
     ]
     CSS_PATH = "../../assets/settings.tcss"
+    HB_MAX = 23
 
     def __init__(self, args: argparse.Namespace):
         super().__init__()
@@ -74,6 +96,9 @@ class Settings(InuHandler, App):
         self.device_id = self.args.device_id[0]
         self.record = None
         self.saved = True
+
+        self.hb_interval = None
+        self.last_hb = None
 
     def compose(self) -> ComposeResult:
         # Header
@@ -94,12 +119,51 @@ class Settings(InuHandler, App):
             setting.set_value(getattr(self.record, config_name))
             w.append(setting)
 
-        await self.mount(containers.ScrollableContainer(*w))
+        container = widgets.Static()
+        await container.mount(InfoWidget())
+        await container.mount(containers.ScrollableContainer(*w))
+        await self.mount(container)
+
+        await self.subscribe_info()
+        self.set_interval(0.2, self.hb_ticker)
 
         def set_saved():
             self.saved = True
 
         self.set_timer(0.01, set_saved)
+
+    async def subscribe_info(self):
+        await self.inu.js.consumer.create(
+            Consumer(const.Streams.HEARTBEAT, ConsumerConfig(
+                filter_subject=const.Subjects.fqs(const.Subjects.HEARTBEAT, self.device_id),
+                deliver_policy=ConsumerConfig.DeliverPolicy.NEW,
+                ack_wait=Time.sec_to_nano(2),
+            )), self.on_hb
+        )
+
+    async def on_hb(self, msg: model.Message):
+        await self.inu.js.msg.ack(msg)
+
+        hb = Heartbeat(msg.get_payload())
+        self.hb_interval = hb.interval
+        self.last_hb = time.time()
+        self.get_widget_by_id("hb_heart").add_class("beat")
+        self.get_widget_by_id("hb_progress").styles.width = 0
+
+        def hb_done():
+            self.get_widget_by_id("hb_heart").remove_class("beat")
+
+        self.set_timer(0.15, hb_done)
+
+    def hb_ticker(self):
+        if self.hb_interval is None:
+            return
+
+        prog = (time.time() - self.last_hb) / self.hb_interval
+        if prog > 1:
+            prog = 1
+
+        self.get_widget_by_id("hb_progress").styles.width = int(self.HB_MAX * prog)
 
     def _on_key(self, event: events.Key) -> None:
         if event.key == "escape":

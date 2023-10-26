@@ -75,7 +75,7 @@ class Monitor(Utility, InuHandler):
                 stream_tally += 1
                 await self.inu.js.consumer.create(
                     Consumer(const.Streams.HEARTBEAT, ConsumerConfig(
-                        subjects=const.Subjects.all(const.Subjects.HEARTBEAT),
+                        filter_subject=const.Subjects.all(const.Subjects.HEARTBEAT),
                         deliver_policy=del_pol,
                         opt_start_time=start_time,
                         ack_wait=ack_wait,
@@ -86,7 +86,7 @@ class Monitor(Utility, InuHandler):
                 stream_tally += 1
                 await self.inu.js.consumer.create(
                     Consumer(const.Streams.ALERTS, ConsumerConfig(
-                        subjects=const.Subjects.all(const.Subjects.ALERT),
+                        filter_subject=const.Subjects.all(const.Subjects.ALERT),
                         deliver_policy=del_pol,
                         opt_start_time=start_time,
                         ack_wait=ack_wait,
@@ -97,7 +97,7 @@ class Monitor(Utility, InuHandler):
                 stream_tally += 1
                 await self.inu.js.consumer.create(
                     Consumer(const.Streams.SETTINGS, ConsumerConfig(
-                        subjects=const.Subjects.all(const.Subjects.SETTINGS),
+                        filter_subject=const.Subjects.all(const.Subjects.SETTINGS),
                         deliver_policy=del_pol,
                         opt_start_time=start_time,
                         ack_wait=ack_wait,
@@ -108,7 +108,7 @@ class Monitor(Utility, InuHandler):
                 stream_tally += 1
                 await self.inu.js.consumer.create(
                     Consumer(const.Streams.COMMAND, ConsumerConfig(
-                        subjects=const.Subjects.all(const.Subjects.COMMAND),
+                        filter_subject=const.Subjects.all(const.Subjects.COMMAND),
                         deliver_policy=del_pol,
                         opt_start_time=start_time,
                         ack_wait=ack_wait,
@@ -119,7 +119,7 @@ class Monitor(Utility, InuHandler):
                 stream_tally += 1
                 await self.inu.js.consumer.create(
                     Consumer(const.Streams.LOGS, ConsumerConfig(
-                        subjects=const.Subjects.all(const.Subjects.LOG),
+                        filter_subject=const.Subjects.all(const.Subjects.LOG),
                         deliver_policy=del_pol,
                         opt_start_time=start_time,
                         ack_wait=ack_wait,

@@ -2,6 +2,46 @@ Screen {
     layout: vertical;
 }
 
+InfoWidget {
+    dock: right;
+    width: 30;
+    height: auto;
+}
+
+InfoWidget .setting_title {
+    color: cyan;
+    padding-left: 2;
+    padding-bottom: 1;
+    height: 2;
+}
+
+InfoWidget Checkbox {
+    width: 100%;
+}
+
+InfoWidget #hb_heart {
+    width: 4;
+}
+
+#hb_heart.beat {
+    color: red;
+}
+
+InfoWidget #hb_progress {
+    padding: 0;
+    margin: 0;
+    width: 0;
+}
+
+.info_sub {
+    height: auto;
+    border: solid darkgreen;
+}
+
+Horizontal {
+    height: auto;
+}
+
 .box {
     height: 7;
     border: solid green;

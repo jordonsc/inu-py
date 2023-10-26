@@ -53,8 +53,8 @@ class MotionApp(InuApp):
             if state == self.SensorState.IDLE:
                 # Idle, can trigger
                 if motion:
-                    self.inu.status(enabled=True, active=True)
-                    await self.inu.set_state(self.SensorState.ACTIVE)
+                    await self.inu.status(enabled=True, active=True)
+                    set_state(self.SensorState.ACTIVE)
                     await self.fire()
 
             elif state == self.SensorState.ACTIVE:
