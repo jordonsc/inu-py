@@ -15,6 +15,13 @@ InfoWidget .setting_title {
     height: 2;
 }
 
+InfoWidget #stat_info {
+    border-left: solid blue;
+    margin: 1;
+    padding: 1;
+    background: rgb(25, 25, 25);
+}
+
 InfoWidget Checkbox {
     width: 100%;
 }
@@ -31,6 +38,14 @@ InfoWidget #hb_progress {
     padding: 0;
     margin: 0;
     width: 0;
+}
+
+InfoWidget #hb_progress.late {
+    color: orange;
+}
+
+InfoWidget #hb_progress.offline {
+    color: red;
 }
 
 .info_sub {

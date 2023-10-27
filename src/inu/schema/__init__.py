@@ -27,12 +27,23 @@ class Schema:
         """
         Hydrate object from a JSON string.
         """
-        self.hydrate_dict(json.loads(payload))
+        d = json.loads(payload)
+
+        if not isinstance(d, dict):
+            # Super weird bug whereby the first invocation of json.loads returns a str instead of dict.
+            # Running the result through the same call again seems to resolve it. Bug was triggered when payload was
+            # a bytes object.
+            d = json.loads(d)
+
+        self.hydrate_dict(d)
 
     def hydrate_dict(self, d: dict):
         """
         Hydrate object from a dictionary.
         """
+        if not isinstance(d, dict):
+            raise Exception(f"d is not a dict: {type(d).__name__}: {d}")
+
         for k, v in d.items():
             if k[0] == '_':
                 logger.warning(f"Attempted to hydrate illegal property '{k}' on {self.__class__.__name__}")

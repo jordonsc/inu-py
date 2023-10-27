@@ -6,7 +6,7 @@ import time
 from textual import widgets, containers, events, validation, on
 from textual.app import App, ComposeResult
 
-from inu import Inu, InuHandler, const
+from inu import Inu, InuHandler, const, Status
 from inu.schema import settings, Heartbeat
 from micro_nats import error as mn_error, model
 from micro_nats.jetstream.protocol.consumer import Consumer, ConsumerConfig
@@ -18,8 +18,9 @@ class InfoWidget(widgets.Static):
     def compose(self) -> ComposeResult:
         stat = widgets.Static(classes="info_sub")
         stat.mount(widgets.Static(f"Status", classes="setting_title"))
-        stat.mount(widgets.Checkbox("Enabled", True, disabled=True, id="stat_enabled"))
+        stat.mount(widgets.Checkbox("Enabled", disabled=True, id="stat_enabled"))
         stat.mount(widgets.Checkbox("Active", disabled=True, id="stat_active"))
+        stat.mount(widgets.Static("", id="stat_info"))
         yield stat
 
         hb = widgets.Static(classes="info_sub")
@@ -133,6 +134,9 @@ class Settings(InuHandler, App):
         self.set_timer(0.01, set_saved)
 
     async def subscribe_info(self):
+        """
+        Subscribes to heartbeat & status streams for the device.
+        """
         await self.inu.js.consumer.create(
             Consumer(const.Streams.HEARTBEAT, ConsumerConfig(
                 filter_subject=const.Subjects.fqs(const.Subjects.HEARTBEAT, self.device_id),
@@ -141,7 +145,29 @@ class Settings(InuHandler, App):
             )), self.on_hb
         )
 
+        await self.inu.js.consumer.create(
+            Consumer(const.Streams.STATUS, ConsumerConfig(
+                filter_subject=const.Subjects.fqs(const.Subjects.STATUS, self.device_id),
+                deliver_policy=ConsumerConfig.DeliverPolicy.LAST_PER_SUBJECT,
+                ack_wait=Time.sec_to_nano(2),
+            )), self.on_stat
+        )
+
+    async def on_stat(self, msg: model.Message):
+        """
+        Device status update received.
+        """
+        await self.inu.js.msg.ack(msg)
+
+        stat = Status(msg.get_payload())
+        self.get_widget_by_id("stat_enabled").value = stat.enabled
+        self.get_widget_by_id("stat_active").value = stat.active
+        self.get_widget_by_id("stat_info").update(stat.status)
+
     async def on_hb(self, msg: model.Message):
+        """
+        Device heartbeat received.
+        """
         await self.inu.js.msg.ack(msg)
 
         hb = Heartbeat(msg.get_payload())
@@ -156,14 +182,37 @@ class Settings(InuHandler, App):
         self.set_timer(0.15, hb_done)
 
     def hb_ticker(self):
+        """
+        Updates the HB animation.
+        """
         if self.hb_interval is None:
             return
 
         prog = (time.time() - self.last_hb) / self.hb_interval
-        if prog > 1:
-            prog = 1
+        prog_bar = self.get_widget_by_id("hb_progress")
+        prog_bar.remove_class("late")
+        prog_bar.remove_class("offline")
+        if prog <= 1:
+            # Device healthy
+            prog_bar.styles.width = int(self.HB_MAX * prog)
+            prog_bar.styles.margin = 0
+        elif prog <= 2:
+            # Heartbeat late
+            if prog >= 1.25:
+                prog_bar.add_class("late")
 
-        self.get_widget_by_id("hb_progress").styles.width = int(self.HB_MAX * prog)
+            prog -= 1
+            prog_bar.styles.width = self.HB_MAX - int(self.HB_MAX * prog)
+            prog_bar.styles.margin = (0, 0, 0, int(self.HB_MAX * prog))
+        elif prog <= 2.:
+            # HB very late
+            prog_bar.styles.width = 0
+            prog_bar.styles.margin = 0
+        else:
+            # Device considered offline
+            prog_bar.styles.width = self.HB_MAX
+            prog_bar.styles.margin = 0
+            prog_bar.add_class("offline")
 
     def _on_key(self, event: events.Key) -> None:
         if event.key == "escape":
