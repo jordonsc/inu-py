@@ -36,6 +36,7 @@ class Inu(io.IoHandler):
         self.pool = TaskPool()
         self.has_settings = False
         self.hb_task = None
+        self.state = Status(enabled=False, active=False, status="")
 
         if isinstance(self.context.device_id, list):
             self.device_id = ".".join(self.context.device_id)
@@ -183,20 +184,38 @@ class Inu(io.IoHandler):
         except Exception as e:
             self.logger.error(f"Command error: {type(e).__name__}: {str(e)}")
 
-    async def status(self, enabled: bool, active: bool, status: str = ""):
+    async def status(self, active: bool = None, status: str = None, enabled: bool = None):
         """
-        Publish the current device state.
+        Update and publish the current device state.
         """
-        payload = Status(enabled=enabled, active=active, status=status)
-        self.logger.debug(f"Device state: {payload}")
+        if active is not None:
+            self.state.active = active
+        if status is not None:
+            self.state.status = status
+        if enabled is not None:
+            self.state.enabled = enabled
+
+        self.logger.debug(f"Device state: {self.state}")
 
         try:
             await self.nats.publish(
                 const.Subjects.fqs(const.Subjects.STATUS, self.device_id),
-                json.dumps(payload.marshal())
+                json.dumps(self.state.marshal())
             )
         except Exception as e:
             self.logger.error(f"Status error: {type(e).__name__}: {str(e)}")
+
+    async def activate(self, status_msg: str = ""):
+        """
+        Sets state to active to True and sets the status string.
+        """
+        await self.status(active=True, status=status_msg)
+
+    async def deactivate(self):
+        """
+        Sets state active to False and clears the status string.
+        """
+        await self.status(active=False, status="")
 
     async def log(self, message: str, level: str = const.LogLevel.INFO):
         """
@@ -250,3 +269,6 @@ class Inu(io.IoHandler):
         await self._kill_heartbeat()
         self.has_settings = False
         self.pool.run(self.handler.on_disconnect())
+
+    def get_central_id(self) -> str:
+        return f"central.{self.device_id}"

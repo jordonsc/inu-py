@@ -22,6 +22,9 @@ class RangeApp(InuApp):
         self.pool = TaskPool()
         self.range_type = self.get_config(["range", "type"])
 
+        self.state = self.SensorState.IDLE
+        self.state_changed = 0
+
         if self.range_type == self.TYPE_SONAR:
             self.sensor = Sonar(
                 uart=1,
@@ -31,60 +34,49 @@ class RangeApp(InuApp):
         else:
             raise NotImplemented(f"Ranging sensor type '{self.range_type}' not supported")
 
-    async def run(self):
-        """
-        Endless app loop.
-        """
-        await self.init()
-
+    async def app_init(self):
         self.pool.run(self.sensor.read_loop())
+        self.inu.status(enabled=True)
 
-        state = self.SensorState.IDLE
-        state_changed = 0
-
+    async def app_tick(self):
         def set_state(s):
-            nonlocal state, state_changed
-            state = s
-            state_changed = time.time()
+            self.state = s
+            self.state_changed = time.time()
 
-        while True:
-            await self.app_tick()
-            await asyncio.sleep(0.1)
+        distance = self.sensor.get_distance()
 
-            distance = self.sensor.get_distance()
-
-            if state == self.SensorState.IDLE:
-                # Idle, can trigger
-                if distance <= self.inu.settings.max_distance:
-                    if self.inu.settings.wait_delay == 0:
-                        # No wait delay, fire immediately
-                        await self.inu.status(enabled=True, active=True, status=f"Range {self.sensor.get_distance()}")
-                        set_state(self.SensorState.ACTIVE)
-                        await self.fire()
-                    else:
-                        set_state(self.SensorState.HOT)
-
-            elif state == self.SensorState.HOT:
-                # Range dropped below threshold
-                if distance > self.inu.settings.max_distance:
-                    set_state(self.SensorState.IDLE)
+        if self.state == self.SensorState.IDLE:
+            # Idle, can trigger
+            if distance and distance <= self.inu.settings.max_distance:
+                if self.inu.settings.wait_delay == 0:
+                    # No wait delay, fire immediately
+                    await self.inu.activate(f"Range {self.sensor.get_distance()}")
+                    set_state(self.SensorState.ACTIVE)
+                    await self.fire()
                 else:
-                    if time.time() - state_changed > (self.inu.settings.wait_delay / 1000):
-                        # Sensor under range for required threshold, fire
-                        await self.inu.status(enabled=True, active=True, status=f"Range {self.sensor.get_distance()}")
-                        set_state(self.SensorState.ACTIVE)
-                        await self.fire()
+                    set_state(self.SensorState.HOT)
 
-            elif state == self.SensorState.ACTIVE:
-                # Sensor must return to normal before allowing it to return to idle state
-                if distance > self.inu.settings.max_distance:
-                    await self.inu.status(enabled=True, active=False)
-                    set_state(self.SensorState.COOLDOWN)
+        elif self.state == self.SensorState.HOT:
+            # Range dropped below threshold
+            if distance > self.inu.settings.max_distance:
+                set_state(self.SensorState.IDLE)
+            else:
+                if time.time() - self.state_changed > (self.inu.settings.wait_delay / 1000):
+                    # Sensor under range for required threshold, fire
+                    await self.inu.activate(f"Range {self.sensor.get_distance()}")
+                    set_state(self.SensorState.ACTIVE)
+                    await self.fire()
 
-            elif state == self.SensorState.COOLDOWN:
-                # In cooldown, return to normal after expiry
-                if time.time() - state_changed > (self.inu.settings.cooldown_time / 1000):
-                    set_state(self.SensorState.IDLE)
+        elif self.state == self.SensorState.ACTIVE:
+            # Sensor must return to normal before allowing it to return to idle state
+            if distance and distance > self.inu.settings.max_distance:
+                await self.inu.deactivate()
+                set_state(self.SensorState.COOLDOWN)
+
+        elif self.state == self.SensorState.COOLDOWN:
+            # In cooldown, return to normal after expiry
+            if time.time() - self.state_changed > (self.inu.settings.cooldown_time / 1000):
+                set_state(self.SensorState.IDLE)
 
     async def fire(self):
         self.logger.info(f"Firing with range {self.sensor.get_distance()}; code {self.inu.settings.trigger_code}")

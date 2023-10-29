@@ -21,6 +21,9 @@ class MotionApp(InuApp):
         self.pool = TaskPool()
         self.motion_type = self.get_config(["motion", "type"])
 
+        self.state = self.SensorState.IDLE
+        self.state_changed = 0
+
         if self.motion_type == self.TYPE_PIR:
             self.sensor = Pir(
                 pin=self.get_config(["motion", "pin"], 33),
@@ -28,45 +31,35 @@ class MotionApp(InuApp):
         else:
             raise NotImplemented(f"Motion sensor type '{self.motion_type}' not supported")
 
-    async def run(self):
-        """
-        Endless app loop.
-        """
-        await self.init()
-
+    async def app_init(self):
         self.pool.run(self.sensor.read_loop())
 
-        state = self.SensorState.IDLE
-        state_changed = 0
+        await self.inu.status(enabled=True)
 
+    async def app_tick(self):
         def set_state(s):
-            nonlocal state, state_changed
-            state = s
-            state_changed = time.time()
+            self.state = s
+            self.state_changed = time.time()
 
-        while True:
-            await self.app_tick()
-            await asyncio.sleep(0.01)
+        motion = self.sensor.is_motion()
 
-            motion = self.sensor.is_motion()
+        if self.state == self.SensorState.IDLE:
+            # Idle, can trigger
+            if motion and self.inu.state.enabled:
+                await self.inu.status(True, "")
+                set_state(self.SensorState.ACTIVE)
+                await self.fire()
 
-            if state == self.SensorState.IDLE:
-                # Idle, can trigger
-                if motion:
-                    await self.inu.status(enabled=True, active=True)
-                    set_state(self.SensorState.ACTIVE)
-                    await self.fire()
+        elif self.state == self.SensorState.ACTIVE:
+            # Sensor must return to normal before allowing it to return to idle state
+            if not motion:
+                await self.inu.status(False, "")
+                set_state(self.SensorState.COOLDOWN)
 
-            elif state == self.SensorState.ACTIVE:
-                # Sensor must return to normal before allowing it to return to idle state
-                if not motion:
-                    await self.inu.status(enabled=True, active=False)
-                    set_state(self.SensorState.COOLDOWN)
-
-            elif state == self.SensorState.COOLDOWN:
-                # In cooldown, return to normal after expiry
-                if time.time() - state_changed > (self.inu.settings.cooldown_time / 1000):
-                    set_state(self.SensorState.IDLE)
+        elif self.state == self.SensorState.COOLDOWN:
+            # In cooldown, return to normal after expiry
+            if time.time() - self.state_changed > (self.inu.settings.cooldown_time / 1000):
+                set_state(self.SensorState.IDLE)
 
     async def fire(self):
         self.logger.info(f"Firing; code {self.inu.settings.trigger_code}")

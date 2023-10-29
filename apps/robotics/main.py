@@ -51,6 +51,8 @@ class RoboticsApp(InuApp):
         s = "" if len(self.robotics.devices) == 1 else "s"
         await self.inu.log(f"Robotics initialised with {len(self.robotics.devices)} device{s}")
 
+        self.inu.status(enabled=True)
+
     async def app_tick(self):
         pass
 
@@ -58,12 +60,21 @@ class RoboticsApp(InuApp):
         # Actionable sequence codes range from seq_0 to seq_5
         if 0 <= code <= 5:
             seq = f"seq_{code}"
-            ctrl = getattr(self.inu.settings, seq)
+            ctrl = getattr(self.inu.settings, seq).strip()
+
+            if len(ctrl) == 0:
+                await self.inu.log(f"Ignoring sequence {code} with no control codes")
+                return
+
             await self.inu.log(f"Execute sequence {code} // {ctrl}")
             try:
+                await self.inu.activate(f"Sequence {code}")
+                # robotics may refuse CPU, so sleep enough time to dispatch the status update
+                await asyncio.sleep(0.05)
                 await self.robotics.run(ctrl)
+                await self.inu.deactivate()
             except Exception as e:
-                await self.inu.log(f"Exception in robotics execution: {type(e).__name__}: {e}", LogLevel.ERROR)
+                await self.inu.log(f"Exception in robotics execution - {type(e).__name__}: {e}", LogLevel.ERROR)
 
 
 if __name__ == "__main__":

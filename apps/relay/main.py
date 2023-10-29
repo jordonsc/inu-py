@@ -21,22 +21,16 @@ class RelayApp(InuApp):
 
         self.relay.off()
 
-    async def run(self):
-        """
-        Endless app loop.
-        """
-        await self.init()
+    async def app_init(self):
+        self.inu.status(enabled=True)
 
-        while True:
-            await self.app_tick()
-            await asyncio.sleep(0.01)
-
-            if self.trigger_start is not None and (
-                    time.time() - self.trigger_start >= self.inu.settings.time_delay
-            ):
-                # Time delay expired, disable relay and clear timer
-                self.trigger_start = None
-                await self.relay.off()
+    async def app_tick(self):
+        if self.trigger_start is not None and (
+                time.time() - self.trigger_start >= self.inu.settings.time_delay
+        ):
+            # Time delay expired, disable relay and clear timer
+            self.trigger_start = None
+            await self.relay.off()
 
     async def on_trigger(self, code: int):
         if code == 1:

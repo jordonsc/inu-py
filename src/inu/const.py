@@ -1,3 +1,6 @@
+INU_BUILD = 12
+
+
 class LogLevel:
     DEBUG = "debug"
     INFO = "info"
@@ -119,3 +122,10 @@ class Streams:
     COMMAND = 'commands'
     HEARTBEAT = 'heartbeats'
     SETTINGS = 'settings'
+
+
+class TriggerCode:
+    INTERRUPT = 100
+    ENABLE_TOGGLE = 110
+    ENABLE_ON = 111
+    ENABLE_OFF = 112

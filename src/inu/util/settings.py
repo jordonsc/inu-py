@@ -8,6 +8,7 @@ from textual.app import App, ComposeResult
 
 from inu import Inu, InuHandler, const, Status
 from inu.schema import settings, Heartbeat
+from inu.schema.command import Trigger
 from micro_nats import error as mn_error, model
 from micro_nats.jetstream.protocol.consumer import Consumer, ConsumerConfig
 from micro_nats.util import Time
@@ -16,6 +17,7 @@ from micro_nats.util import Time
 class InfoWidget(widgets.Static):
 
     def compose(self) -> ComposeResult:
+        # Device status
         stat = widgets.Static(classes="info_sub")
         stat.mount(widgets.Static(f"Status", classes="setting_title"))
         stat.mount(widgets.Checkbox("Enabled", disabled=True, id="stat_enabled"))
@@ -23,6 +25,7 @@ class InfoWidget(widgets.Static):
         stat.mount(widgets.Static("", id="stat_info"))
         yield stat
 
+        # Device heartbeat
         hb = widgets.Static(classes="info_sub")
         hb.mount(widgets.Static(f"Heartbeat", classes="setting_title"))
         hb.mount(containers.Horizontal(
@@ -30,6 +33,14 @@ class InfoWidget(widgets.Static):
             widgets.Rule(id="hb_progress", line_style="heavy")
         ))
         yield hb
+
+        # Send device commands
+        cmd = widgets.Static(classes="info_sub")
+        cmd.mount(widgets.Button("Toggle Enabled", id="btn_enabled"))
+        cmd.mount(widgets.Button("Send Trigger", id="btn_trigger"))
+        cmd.mount(widgets.Input("0", validators=validation.Integer(minimum=0, maximum=99), id="trg_code"))
+        cmd.mount(widgets.Button("Interrupt", id="btn_interrupt"))
+        yield cmd
 
 
 class SettingsWidget(widgets.Static):
@@ -229,6 +240,20 @@ class Settings(InuHandler, App):
     @on(widgets.Checkbox.Changed)
     def on_checkbox_changed(self, _) -> None:
         self.saved = False
+
+    async def on_button_pressed(self, event: widgets.Button.Pressed) -> None:
+        trg = Trigger()
+        if event.button.id == "btn_trigger":
+            trg.code = int(self.get_widget_by_id("trg_code").value)
+        elif event.button.id == "btn_interrupt":
+            trg.code = const.TriggerCode.INTERRUPT
+        elif event.button.id == "btn_enabled":
+            trg.code = const.TriggerCode.ENABLE_TOGGLE
+
+        await self.inu.nats.publish(
+            const.Subjects.fqs([const.Subjects.COMMAND, const.Subjects.COMMAND_TRIGGER], f"central.{self.device_id}"),
+            trg.marshal()
+        )
 
     async def init(self):
         """

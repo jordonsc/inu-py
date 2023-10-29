@@ -11,8 +11,6 @@ from wifi import Wifi, error as wifi_err
 
 
 class InuApp(InuHandler):
-    INU_VERSION = "1.0.0"
-
     def __init__(self, settings_class: type):
         self.config = {}
         self.wifi = Wifi()
@@ -121,7 +119,7 @@ class InuApp(InuHandler):
 
         print("\nBootstrap complete\n")
         await self.inu.status(enabled=True, active=False)
-        await self.inu.log(f"ONLINE // Inu v{self.INU_VERSION} at {ifcfg.ip}")
+        await self.inu.log(f"ONLINE // Inu build {const.INU_BUILD} at {ifcfg.ip}")
 
         return True
 
@@ -149,7 +147,12 @@ class InuApp(InuHandler):
                 self.wifi.connect()
                 await self.wifi.wait_for_connect()
 
-            await self.app_tick()
+            try:
+                await self.app_tick()
+            except Exception as e:
+                await self.inu.log(f"Application error - {type(e).__name__}: {e}")
+                await asyncio.sleep(1)
+
             await asyncio.sleep(0.01)
 
     async def app_tick(self):
@@ -158,19 +161,44 @@ class InuApp(InuHandler):
         """
         pass
 
+    async def parse_trigger_code(self, code: int):
+        """
+        Appropriately process a trigger message for the given code.
+
+        This will execute special logic for the special codes (const.TriggerCode codes). Will pass on to `on_trigger()`
+        if the code is non-special
+        """
+        if code == const.TriggerCode.INTERRUPT:
+            await self.on_interrupt()
+        elif code == const.TriggerCode.ENABLE_TOGGLE:
+            await self.inu.status(enabled=not self.inu.state.enabled)
+            await self.on_enabled_changed(self.inu.state.enabled)
+        elif code == const.TriggerCode.ENABLE_ON:
+            if not self.inu.state.enabled:
+                await self.inu.status(enabled=True)
+                await self.on_enabled_changed(True)
+        elif code == const.TriggerCode.ENABLE_OFF:
+            if self.inu.state.enabled:
+                await self.inu.status(enabled=False)
+                await self.on_enabled_changed(False)
+        else:
+            # Normal triggers can only execute when enabled
+            if self.inu.state.enabled:
+                await self.on_trigger(code)
+            else:
+                await self.inu.log("Ignoring trigger while disabled")
+
     async def on_settings_updated(self):
         """
         Settings updated. Override to update anything with new settings.
 
         IMPORTANT: be sure to call super() as this will subscribe to listen-devices.
         """
-        if not hasattr(self.inu.settings, 'listen_subjects'):
-            return
-
         # Purge any existing listen device consumers
         for cons_name in self.listen_device_consumers:
             await self.inu.js.consumer.delete(const.Streams.COMMAND, cons_name)
 
+        # Create a new subject listener (subjects may have changed with settings)
         async def on_subject_trigger(msg: model.Message):
             await self.inu.js.msg.ack(msg)
 
@@ -182,12 +210,20 @@ class InuApp(InuHandler):
                 code = 0
 
             self.logger.info(f"Trigger from {msg.subject}: code {code}")
-            await self.on_trigger(code)
+            await self.parse_trigger_code(code)
 
-        subjects = self.inu.settings.listen_subjects.split(" ")
+        # Even if we don't have listen subjects, listen to your own "central" address
+        if not hasattr(self.inu.settings, 'listen_subjects'):
+            subjects = [self.inu.get_central_id()]
+        else:
+            subjects = self.inu.settings.listen_subjects.split(" ")
+            subjects.append(self.inu.get_central_id())
 
         # Create consumers for all subjects
         for subject in subjects:
+            if not subject.strip():
+                continue
+
             cons = await self.inu.js.consumer.create(
                 consumer.Consumer(
                     const.Streams.COMMAND,
@@ -206,6 +242,20 @@ class InuApp(InuHandler):
     async def on_trigger(self, code: int):
         """
         Called when a listen-device publishes a `trigger` message.
+
+        Special codes (such as enabled, interrupt) are filtered out.
+        """
+        pass
+
+    async def on_interrupt(self):
+        """
+        A listen-device has published an interrupt code.
+        """
+        pass
+
+    async def on_enabled_changed(self, enabled: bool):
+        """
+        Device enabled status was changed by a listen-device.
         """
         pass
 
