@@ -3,7 +3,7 @@ import logging
 import time
 
 import machine
-from inu.hardware import RangingSensor
+from ..hardware import RangingSensor
 
 
 class Sonar(RangingSensor):

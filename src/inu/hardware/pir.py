@@ -2,7 +2,7 @@ import asyncio
 import logging
 
 from machine import Pin
-from inu.hardware import MotionSensor
+from ..hardware import MotionSensor
 
 
 class Pir(MotionSensor):

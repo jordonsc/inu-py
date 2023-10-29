@@ -1,3 +1,5 @@
+from . import Control
+from ..robotics import RoboticsDevice, Move
 from machine import Pin, PWM
 import time
 
@@ -10,22 +12,25 @@ class StepperDriver:
 
 
 class LeadScrew:
-    def __init__(self, steps_per_rev: int = 1600, microstepping: int = 8, screw_lead: int = 8):
+    def __init__(self, steps_per_rev: int = 1600, microstepping: int = 8, screw_lead: int = 8, forward: int = 1):
+        # Number of steps per revolution
         self.steps_per_rev = steps_per_rev
+
+        # Number of microsteps in a step
         self.microsteps = microstepping
+
+        # Screw lead (distance actuator moves for 1 rotation)
         self.screw_lead = screw_lead
+
+        # Driver direction that is "forward"
+        self.forward = forward
 
     def __repr__(self):
         return f"steps/rev: {self.steps_per_rev}; microsteps: {self.microsteps}; lead: {self.screw_lead}"
 
 
-class Stepper:
-    class Direction:
-        CLOCKWISE: int = 1
-        CW: int = 1
-
-        COUNTERCLOCKWISE: int = 0
-        CCW: int = 0
+class Stepper(RoboticsDevice):
+    CONFIG_CODE = "stepper"
 
     def __init__(self, driver: StepperDriver, screw: LeadScrew):
         self.driver = driver
@@ -54,7 +59,7 @@ class Stepper:
 
         NB: Calling `drive()` will enable the motor power, but not disable it following.
         """
-        self.driver.enabled.value(on == True)
+        self.driver.enabled.value(on)
 
     def distance_to_steps(self, displacement: float) -> int:
         """
@@ -68,7 +73,7 @@ class Stepper:
         """
         return round(speed / self.screw.screw_lead * self.screw.steps_per_rev)
 
-    def drive(self, distance: float, speed: float = 10, direction: int = Direction.CW):
+    async def drive(self, distance: float, speed: float = 10, direction: int = 1):
         """
         Move the actuator by a given distance.
 
@@ -81,6 +86,9 @@ class Stepper:
 
         If the driver isn't enabled, it will be enabled. Does not disable upon completion.
         """
+        # Flip the direction if the screw direction is reversed
+        direction = int(not (self.screw.forward ^ direction))
+
         if self.driver.enabled.value() == 0:
             self.set_power(True)
 
@@ -98,3 +106,12 @@ class Stepper:
             pass
 
         pwm.deinit()
+
+    async def execute(self, ctrl: Control):
+        if isinstance(ctrl, Move):
+            direction = int(ctrl.get_distance() >= 0)
+            distance = abs(ctrl.get_distance())
+            await self.drive(distance, ctrl.get_speed(), direction)
+
+    def __repr__(self):
+        return f"Stepper <{self.screw}>"
