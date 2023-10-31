@@ -5,6 +5,7 @@ import machine
 
 from inu import InuHandler, Inu, const
 from micro_nats import model
+from micro_nats.error import NotFoundError
 from micro_nats.jetstream.protocol import consumer
 from micro_nats.util import Time
 from wifi import Wifi, error as wifi_err

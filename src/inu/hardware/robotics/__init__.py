@@ -149,6 +149,12 @@ class RoboticsDevice:
         """
         pass
 
+    def set_power(self, powered: bool):
+        """
+        Powers or un-powers the device. May do nothing depending on if the device has a passive power state.
+        """
+        pass
+
 
 class Robotics:
     """
@@ -175,6 +181,13 @@ class Robotics:
             raise error.BadRequest(f"Device '{device.get_device()}' not registered")
 
         self.active_device = device.get_device()
+
+    def set_power(self, powered: bool):
+        """
+        Modifies the power state for all devices.
+        """
+        for device in self.devices:
+            device.set_power(powered)
 
     async def run(self, ctrl_list: str):
         """

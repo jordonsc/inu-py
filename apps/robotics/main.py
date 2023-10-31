@@ -53,6 +53,7 @@ class RoboticsApp(InuApp):
         await self.inu.log(f"Robotics initialised with {len(self.robotics.devices)} device{s}")
 
         self.inu.status(enabled=True)
+        self.robotics.set_power(True)
 
     async def app_tick(self):
         pass
@@ -76,6 +77,12 @@ class RoboticsApp(InuApp):
                 await self.inu.deactivate()
             except Exception as e:
                 await self.inu.log(f"Exception in robotics execution - {type(e).__name__}: {e}", LogLevel.ERROR)
+
+    async def on_enabled_changed(self, enabled: bool):
+        """
+        Device enabled status was changed by a listen-device.
+        """
+        self.robotics.set_power(enabled)
 
 
 if __name__ == "__main__":
