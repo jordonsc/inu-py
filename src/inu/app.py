@@ -196,7 +196,10 @@ class InuApp(InuHandler):
         """
         # Purge any existing listen device consumers
         for cons_name in self.listen_device_consumers:
-            await self.inu.js.consumer.delete(const.Streams.COMMAND, cons_name)
+            try:
+                await self.inu.js.consumer.delete(const.Streams.COMMAND, cons_name)
+            except NotFoundError:
+                pass
 
         # Create a new subject listener (subjects may have changed with settings)
         async def on_subject_trigger(msg: model.Message):

@@ -164,6 +164,7 @@ class Robotics:
         """
         Add a RoboticsDevice controller to the list of actionable devices.
         """
+        self.logger.info(f"Adding controller: {controller}")
         self.devices[device_id] = controller
 
     def select_device(self, device: Select):

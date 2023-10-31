@@ -34,14 +34,15 @@ class RoboticsApp(InuApp):
             if device_type == stepper.Stepper.CONFIG_CODE:
                 self.robotics.add_device(device_id, stepper.Stepper(
                     stepper.StepperDriver(
-                        pulse=self.get_config(["robotics", "driver", "pulse_pin"], 33),
-                        direction=self.get_config(["robotics", "driver", "direction_pin"], 38),
-                        enabled=self.get_config(["robotics", "driver", "enabled_pin"], 8),
+                        pulse=device_cfg(spec, ["driver", "pulse_pin"], 33),
+                        direction=device_cfg(spec, ["driver", "direction_pin"], 38),
+                        enabled=device_cfg(spec, ["driver", "enabled_pin"], 8),
                     ),
                     stepper.LeadScrew(
-                        steps_per_rev=self.get_config(["robotics", "screw", "steps_per_rev"], 1600),
-                        microstepping=self.get_config(["robotics", "screw", "microstepping"], 8),
-                        screw_lead=self.get_config(["robotics", "screw", "screw_lead"], 5),
+                        steps_per_rev=device_cfg(spec, ["screw", "steps_per_rev"], 1600),
+                        microstepping=device_cfg(spec, ["screw", "microstepping"], 8),
+                        screw_lead=device_cfg(spec, ["screw", "screw_lead"], 5),
+                        forward=device_cfg(spec, ["screw", "forward"], 1),
                     ),
                 ))
 
