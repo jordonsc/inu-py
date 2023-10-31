@@ -70,7 +70,7 @@ class RoboticsApp(InuApp):
             await self.inu.log(f"Execute sequence {code} // {ctrl}")
             try:
                 await self.inu.activate(f"Sequence {code}")
-                # robotics may refuse CPU, so sleep enough time to dispatch the status update
+                # robotics.run() may monopolise CPU, so sleep enough time to dispatch the status update
                 await asyncio.sleep(0.05)
                 await self.robotics.run(ctrl)
                 await self.inu.deactivate()

@@ -207,13 +207,13 @@ class Inu(io.IoHandler):
 
     async def activate(self, status_msg: str = ""):
         """
-        Sets state to active to True and sets the status string.
+        Sets state to active to True & sets the status string, then dispatches a `status` message.
         """
         await self.status(active=True, status=status_msg)
 
     async def deactivate(self):
         """
-        Sets state active to False and clears the status string.
+        Sets state active to False & clears the status string, then dispatches a `status` message.
         """
         await self.status(active=False, status="")
 
