@@ -186,7 +186,7 @@ class Robotics:
         """
         Modifies the power state for all devices.
         """
-        for device in self.devices:
+        for device in self.devices.values():
             device.set_power(powered)
 
     async def run(self, ctrl_list: str):
