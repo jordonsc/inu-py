@@ -46,19 +46,20 @@ class MotionApp(InuApp):
         if self.state == self.SensorState.IDLE:
             # Idle, can trigger
             if motion and self.inu.state.enabled:
-                await self.inu.status(True, "")
+                await self.inu.activate()
                 set_state(self.SensorState.ACTIVE)
                 await self.fire()
 
         elif self.state == self.SensorState.ACTIVE:
             # Sensor must return to normal before allowing it to return to idle state
             if not motion:
-                await self.inu.status(False, "")
+                await self.inu.deactivate(const.Strings.COOLDOWN)
                 set_state(self.SensorState.COOLDOWN)
 
         elif self.state == self.SensorState.COOLDOWN:
             # In cooldown, return to normal after expiry
             if time.time() - self.state_changed > (self.inu.settings.cooldown_time / 1000):
+                await self.inu.deactivate()
                 set_state(self.SensorState.IDLE)
 
     async def fire(self):

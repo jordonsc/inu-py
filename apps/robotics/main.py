@@ -1,10 +1,15 @@
 import asyncio
 
-from inu import error
+from inu import error, const
 from inu.app import InuApp
 from inu.const import LogLevel
 from inu.hardware.robotics import Robotics, stepper
+from inu.schema.command import Jog
 from inu.schema.settings.robotics import Robotics as RoboSettings
+from micro_nats.error import NotFoundError
+from micro_nats.jetstream.protocol import consumer
+from micro_nats.model import Message
+from micro_nats.util import Time
 from micro_nats.util.asynchronous import TaskPool
 
 
@@ -13,6 +18,7 @@ class RoboticsApp(InuApp):
         super().__init__(RoboSettings)
         self.pool = TaskPool()
         self.robotics = Robotics()
+        self.jog_consumer = None
 
     def load_devices(self):
         """
@@ -47,13 +53,16 @@ class RoboticsApp(InuApp):
                 ))
 
     async def app_init(self):
+        """
+        NB: a robotics device does NOT enable itself on init.
+
+        When it powers up, it is disabled until manually activated to ensure mechanical components are in the correct
+        state.
+        """
         self.load_devices()
 
         s = "" if len(self.robotics.devices) == 1 else "s"
         await self.inu.log(f"Robotics initialised with {len(self.robotics.devices)} device{s}")
-
-        self.inu.status(enabled=True)
-        self.robotics.set_power(True)
 
     async def app_tick(self):
         pass
@@ -70,19 +79,90 @@ class RoboticsApp(InuApp):
 
             await self.inu.log(f"Execute sequence {code} // {ctrl}")
             try:
-                await self.inu.activate(f"Sequence {code}")
+                await self.inu.activate(f"{const.Strings.SEQ} {code}")
                 # robotics.run() may monopolise CPU, so sleep enough time to dispatch the status update
                 await asyncio.sleep(0.05)
                 await self.robotics.run(ctrl)
+
+                if self.inu.settings.cooldown_time:
+                    await self.inu.deactivate(const.Strings.COOLDOWN)
+                    await asyncio.sleep(self.inu.settings.cooldown_time)
+
                 await self.inu.deactivate()
+
             except Exception as e:
                 await self.inu.log(f"Exception in robotics execution - {type(e).__name__}: {e}", LogLevel.ERROR)
 
     async def on_enabled_changed(self, enabled: bool):
         """
-        Device enabled status was changed by a listen-device.
+        Enabled-state changed externally.
         """
         self.robotics.set_power(enabled)
+
+    async def on_settings_updated(self):
+        await super().on_settings_updated()
+
+        if self.jog_consumer:
+            try:
+                await self.inu.js.consumer.delete(const.Streams.COMMAND, self.jog_consumer.name)
+            except NotFoundError:
+                pass
+
+        subj = const.Subjects.fqs(
+            [const.Subjects.COMMAND, const.Subjects.COMMAND_JOG],
+            self.inu.get_central_id()
+        )
+        self.jog_consumer = await self.inu.js.consumer.create(
+            consumer.Consumer(
+                const.Streams.COMMAND,
+                consumer_cfg=consumer.ConsumerConfig(
+                    filter_subject=subj,
+                    deliver_policy=consumer.ConsumerConfig.DeliverPolicy.NEW,
+                    ack_wait=Time.sec_to_nano(3),
+                )
+            ), push_callback=self.on_jog,
+        )
+        self.logger.info(f"Listening for jogs on '{subj}'")
+
+    async def on_jog(self, msg: Message):
+        """
+        We can jog an actuator remotely by sending `cmd.jog` messages. This will only work when NOT enabled and should
+        be used for calibration or maintenance.
+        """
+        if self.inu.state.enabled:
+            await self.inu.log("Cannot jog while enabled", LogLevel.WARNING)
+            await self.inu.js.msg.term(msg)
+            return
+
+        acked = False
+        try:
+            jog = Jog(msg.get_payload())
+            jog.distance = int(jog.distance)
+            jog.speed = int(jog.speed)
+
+            if jog.device_id not in self.robotics.devices:
+                await self.inu.log(f"Device {jog.device_id} not registered - cannot jog", LogLevel.WARNING)
+                await self.inu.js.msg.term(msg)
+                return
+
+            if jog.distance == 0 or jog.speed <= 0:
+                await self.inu.log(f"Bad jog request: {jog.distance} mm at {jog.speed} mm/s", LogLevel.WARNING)
+                await self.inu.js.msg.term(msg)
+                return
+
+            acked = True
+            await self.inu.js.msg.ack(msg)
+            self.logger.info(f"Jog {jog.device_id} by {jog.distance} mm at {jog.speed} mm/s")
+
+            await self.inu.activate(f"Jog {jog.device_id}: {jog.distance}x{jog.speed}")
+            await asyncio.sleep(0.05)
+            await self.robotics.run(f"SEL {jog.device_id}; MV {jog.distance} {jog.speed}")
+            await self.inu.deactivate()
+
+        except Exception as e:
+            self.inu.log(f"Error jogging - {type(e).__name__}: {e}", LogLevel.ERROR)
+            if not acked:
+                await self.inu.js.msg.nack(msg)
 
 
 if __name__ == "__main__":

@@ -119,7 +119,6 @@ class InuApp(InuHandler):
             await asyncio.sleep(0.1)
 
         print("\nBootstrap complete\n")
-        await self.inu.status(enabled=True, active=False)
         await self.inu.log(f"ONLINE // Inu build {const.INU_BUILD} at {ifcfg.ip}")
 
         return True

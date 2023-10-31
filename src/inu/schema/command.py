@@ -7,3 +7,9 @@ class Command(Schema):
 
 class Trigger(Command):
     code: int = None
+
+
+class Jog(Command):
+    device_id: str = None
+    distance: int = 0
+    speed: int = 0

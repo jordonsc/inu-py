@@ -197,6 +197,7 @@ class Robotics:
 
         for ctrl in control_list:
             self.logger.info(f"EXEC: {ctrl}")
+            await asyncio.sleep(0)
 
             # Non-tangible codes -
             if isinstance(ctrl, Select):

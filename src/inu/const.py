@@ -1,4 +1,4 @@
-INU_BUILD = 12
+INU_BUILD = 13
 
 
 class LogLevel:
@@ -73,12 +73,14 @@ class Subjects:
     # {'enabled': bool, 'active': bool, 'status': str}
     STATUS = 'status'
 
-    # Commands require action from other devices, such as a trigger
-    # {...}
+    # Base command, always requires a sub-command in the subject.
     COMMAND = 'cmd'
 
-    # {'code': int, ...}
+    # {'code': int}
     COMMAND_TRIGGER = 'trigger'
+
+    # {'device': str, 'distance': int, 'speed': int}
+    COMMAND_JOG = 'jog'
 
     # Heartbeats let a controller know that you're still alive and detect devices going offline
     # {'uptime': int64}
@@ -129,3 +131,9 @@ class TriggerCode:
     ENABLE_TOGGLE = 110
     ENABLE_ON = 111
     ENABLE_OFF = 112
+
+
+class Strings:
+    RANGE = "Range"
+    SEQ = "Sequence"
+    COOLDOWN = "Cooldown"

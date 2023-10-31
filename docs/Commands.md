@@ -32,3 +32,14 @@ into the core of the `InuApp` which will define special logic:
  * `110`: Toggle device ENABLE state (an on/off toggle for the listen device)
  * `111`: Enable the device
  * `112`: Disable the device
+
+Jog Command
+-----------
+The Jog command is designed for robotics devices that might need manual adjustments. The Jog command includes a device
+ID and a set of `MOVE` arguments to jog an actuator or mechanical device a short distance. 
+
+Robotics devices will only listen to Jog commands when the device is NOT enabled and will only listen on the devices
+own `central` subject. This ensures:
+
+ * Jogging must be a manual action, not initiated by automation (intended for calibration & maintenance)
+ * The device cannot jog while it is able to receive triggers that will activate a sequence

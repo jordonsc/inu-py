@@ -1,3 +1,5 @@
+import asyncio
+
 from . import Control
 from ..robotics import RoboticsDevice, Move
 from machine import Pin, PWM
@@ -32,13 +34,22 @@ class LeadScrew:
 class Stepper(RoboticsDevice):
     CONFIG_CODE = "stepper"
 
-    def __init__(self, driver: StepperDriver, screw: LeadScrew):
+    # Required time remaining in an operation (in nanoseconds) to allow yielding CPU
+    MIN_SLEEP_TIME = 0.5 * 10 ** 9  # 0.5 seconds
+
+    def __init__(self, driver: StepperDriver, screw: LeadScrew, allow_sleep: bool = True):
+        """
+        `allow_sleep` will allow the device to yield CPU if there is more than MIN_SLEEP_TIME nanoseconds remaining in
+        the operation.
+        """
         self.driver = driver
         self.screw = screw
 
         self.driver.pulse.off()
         self.driver.direction.off()
         self.driver.enabled.off()
+
+        self.allow_sleep = allow_sleep
 
     def on(self):
         """
@@ -103,7 +114,9 @@ class Stepper(RoboticsDevice):
 
         # Do NOT use sleep - this must be as dead accurate as possible
         while time.time_ns() - start_time < op_time:
-            pass
+            if self.allow_sleep and time.time_ns() - start_time > self.MIN_SLEEP_TIME:
+                # allow other tasks to run if we have more than MIN_SLEEP_TIME ns remaining
+                await asyncio.sleep(0)
 
         pwm.deinit()
 

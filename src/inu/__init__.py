@@ -211,11 +211,11 @@ class Inu(io.IoHandler):
         """
         await self.status(active=True, status=status_msg)
 
-    async def deactivate(self):
+    async def deactivate(self, status_msg: str = ""):
         """
         Sets state active to False & clears the status string, then dispatches a `status` message.
         """
-        await self.status(active=False, status="")
+        await self.status(active=False, status=status_msg)
 
     async def log(self, message: str, level: str = const.LogLevel.INFO):
         """
