@@ -1,4 +1,6 @@
 textual
+esptool
 mpremote
 aiohttp
 aiofiles
+gcloud

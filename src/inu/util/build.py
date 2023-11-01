@@ -3,17 +3,19 @@ import glob
 import json
 import logging
 import os
+import shutil
+import struct
 import tarfile
 import tempfile
 from os.path import dirname as up
-import shutil
 
 import aiofiles
 import aiohttp
-
+from gcloud import storage
 from mpremote import commands as mpremote
 from mpremote.main import State
 
+from inu import const
 from inu.util import Utility
 
 
@@ -41,11 +43,15 @@ class Build(Utility):
     # Github archive structure
     GIT_PATH = "https://github.com/{lib}/archive/refs/tags/{tag}{ext}"
 
+    # Over-the-air updates
+    OTA_BUCKET = "inu-ota"
+
     def __init__(self, args: argparse.Namespace):
         super().__init__(args)
         self.logger = logging.getLogger('inu.util.build')
         self.root_dir = up(up(up(up(os.path.realpath(__file__)))))
         self.local_dir = None
+        self.ota_packet = None
         self.state = None
 
     async def run(self):
@@ -65,11 +71,18 @@ class Build(Utility):
         self.state = State()
         await self.get_libs(self.LIB_TAG)
 
-        if self.args.local:
+        if self.args.local or self.args.ota:
+            if self.args.settings:
+                self.logger.error("You cannot use --settings with --ota or --local")
+                return
+
             self.local_dir = self.root_dir + f"/build/apps/{'.'.join(device_id)}/"
             if os.path.exists(self.local_dir):
                 shutil.rmtree(self.local_dir)
             os.makedirs(self.local_dir, exist_ok=True)
+
+        if self.args.ota:
+            self.ota_packet = struct.pack("<I", const.INU_BUILD)
 
         self.logger.info(f"Building {device_id}..")
 
@@ -97,7 +110,8 @@ class Build(Utility):
         self.send_files("src/wifi", "wifi")
 
         # MicroPython libs
-        self.mkdir("lib")
+        if self.ota_packet is None:
+            self.mkdir("lib")
         mc = self.get_lib_root(short_form=True)
         self.send_file(f"{mc}/python-stdlib/base64/base64.py", "lib/base64.py")
         self.send_file(f"{mc}/python-stdlib/datetime/datetime.py", "lib/datetime.py")
@@ -107,7 +121,23 @@ class Build(Utility):
             self.logger.debug("Disconnecting..")
             mpremote.do_disconnect(self.state, MpArgs())
 
+        if self.ota_packet:
+            self.logger.info("Transmitting OTA package..")
+            with open(self.local_dir + f"build-{const.INU_BUILD}.ota", "wb") as fp:
+                fp.write(self.ota_packet)
+            self.send_ota_package(device_id[0])
+
         self.logger.info("Done")
+
+    def send_ota_package(self, app_code: str):
+        client = storage.Client.from_service_account_json(f"{self.root_dir}/config/ota-service-account.json")
+        bucket = client.get_bucket(self.OTA_BUCKET)
+
+        ota_object = bucket.blob(f"{app_code}/build-{const.INU_BUILD}.ota")
+        ota_object.upload_from_filename(self.local_dir + f"build-{const.INU_BUILD}.ota")
+
+        version_object = bucket.blob(f"{app_code}/version")
+        version_object.upload_from_string(str(const.INU_BUILD).encode())
 
     def create_config_file(self, device_id) -> str:
         """
@@ -218,18 +248,22 @@ class Build(Utility):
         if dest is None:
             dest = ""
         else:
-            self.mkdir_path(dest)
+            if self.ota_packet is None:
+                self.mkdir_path(dest)
             dest += "/"
 
         files = self.get_files(src)
         for file in files:
             tgt = f"{dest}{file.short_fn}"
             if file.is_dir:
-                self.mkdir(tgt)
+                if self.ota_packet is None:
+                    self.mkdir(tgt)
             else:
                 self.logger.debug(f"cp {tgt}")
 
-                if self.local_dir:
+                if self.ota_packet:
+                    self.add_ota_file(file.abs_fn, tgt)
+                elif self.local_dir:
                     shutil.copy(file.abs_fn, self.local_dir + tgt)
                 else:
                     mpremote.do_filesystem(self.state, MpArgs(command=["cp"], path=[file.abs_fn, f":{tgt}"]))
@@ -244,10 +278,20 @@ class Build(Utility):
             src = f"{self.root_dir}/{src}"
 
         self.logger.debug(f"cp {dest}")
-        if self.local_dir:
+        if self.ota_packet:
+            self.add_ota_file(src, dest)
+        elif self.local_dir:
             shutil.copy(src, self.local_dir + dest)
         else:
             mpremote.do_filesystem(self.state, MpArgs(command=["cp"], path=[src, f":{dest}"]))
+
+    def add_ota_file(self, src: str, dest: str):
+        with open(src, "rb") as fp:
+            content = fp.read()
+            self.ota_packet += struct.pack("<I", len(dest))
+            self.ota_packet += dest.encode()
+            self.ota_packet += struct.pack("<I", len(content))
+            self.ota_packet += content
 
     async def get_libs(self, tag: str, ext: str = ".tar.gz"):
         """
