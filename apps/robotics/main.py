@@ -1,8 +1,8 @@
 import asyncio
 
-from inu import error, const
+from inu import error, const, Status
 from inu.app import InuApp
-from inu.const import LogLevel
+from inu.const import LogLevel, Priority
 from inu.hardware.robotics import Robotics, stepper
 from inu.schema.command import Jog
 from inu.schema.settings.robotics import Robotics as RoboSettings
@@ -53,21 +53,40 @@ class RoboticsApp(InuApp):
                 ))
 
     async def app_init(self):
-        """
-        NB: a robotics device does NOT enable itself on init.
-
-        When it powers up, it is disabled until manually activated to ensure mechanical components are in the correct
-        state.
-        """
         self.load_devices()
 
         s = "" if len(self.robotics.devices) == 1 else "s"
-        await self.inu.log(f"Robotics initialised with {len(self.robotics.devices)} device{s}")
+        self.logger.info(f"Robotics initialised with {len(self.robotics.devices)} device{s}")
+
+        # We'll decide if we power up enabled by checking the previous device state and determining if it is safe -
+        try:
+            last_status = await self.inu.js.msg.get_last(
+                const.Streams.STATUS,
+                const.Subjects.fqs(const.Subjects.STATUS, self.inu.device_id)
+
+            )
+
+            stat = Status(last_status.get_payload())
+            # If we were ENABLED but not ACTIVE (eg idle), then we'll allow powering-up enabled
+            if stat.enabled and not stat.active:
+                await self.inu.log("Previous state is idle; starting enabled")
+                self.inu.status(enabled=True)
+            else:
+                await self.inu.log("Unsafe to start enabled; starting disabled", LogLevel.WARNING)
+                await self.inu.alert("Unsafe robotics power-up - state unknown, calibration required", Priority.P3)
+
+        except NotFoundError:
+            # No previous state found, start disabled and expect calibration
+            await self.inu.log("No prior state found; starting disabled", LogLevel.WARNING)
 
     async def app_tick(self):
         pass
 
     async def on_trigger(self, code: int):
+        if self.inu.state.active:
+            await self.inu.log("Ignoring trigger while active")
+            return
+
         # Actionable sequence codes range from seq_0 to seq_5
         if 0 <= code <= 5:
             seq = f"seq_{code}"
@@ -131,6 +150,11 @@ class RoboticsApp(InuApp):
         """
         if self.inu.state.enabled:
             await self.inu.log("Cannot jog while enabled", LogLevel.WARNING)
+            await self.inu.js.msg.term(msg)
+            return
+
+        if self.inu.state.active:
+            await self.inu.log("Ignoring jog while active")
             await self.inu.js.msg.term(msg)
             return
 

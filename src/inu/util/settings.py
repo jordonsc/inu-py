@@ -8,14 +8,13 @@ from textual.app import App, ComposeResult
 
 from inu import Inu, InuHandler, const, Status
 from inu.schema import settings, Heartbeat
-from inu.schema.command import Trigger
+from inu.schema.command import Trigger, Jog
 from micro_nats import error as mn_error, model
 from micro_nats.jetstream.protocol.consumer import Consumer, ConsumerConfig
 from micro_nats.util import Time
 
 
 class InfoWidget(widgets.Static):
-
     def compose(self) -> ComposeResult:
         # Device status
         stat = widgets.Static(classes="info_sub")
@@ -27,7 +26,7 @@ class InfoWidget(widgets.Static):
 
         # Device heartbeat
         hb = widgets.Static(classes="info_sub")
-        hb.mount(widgets.Static(f"Heartbeat", classes="setting_title"))
+        hb.mount(widgets.Static("Heartbeat", classes="setting_title"))
         hb.mount(containers.Horizontal(
             widgets.Static(f" :heart: ", id="hb_heart"),
             widgets.Rule(id="hb_progress", line_style="heavy")
@@ -41,6 +40,28 @@ class InfoWidget(widgets.Static):
         cmd.mount(widgets.Input("0", validators=validation.Integer(minimum=0, maximum=99), id="trg_code"))
         cmd.mount(widgets.Button("Interrupt", id="btn_interrupt"))
         yield cmd
+
+        # Jog (robotics only)
+        jog = widgets.Static(classes="info_sub", id="jog_controls")
+        jog.mount(widgets.Static("Jog Controls", classes="setting_title"))
+        jog.mount(widgets.Checkbox("Jog mode", id="btn_jog_mode"))
+        jog.mount(widgets.Input("A0", id="jog_device"))
+        jog_grid = widgets.Static(id="jog_grid")
+        jog_grid.mount(widgets.Static("Distance", classes="setting_subtitle"))
+        jog_grid.mount(widgets.Static("1 mm", id="jog_distance", classes="setting_setting"))
+        jog_grid.mount(widgets.Static("Speed", classes="setting_subtitle"))
+        jog_grid.mount(widgets.Static("2 mm/s", id="jog_speed", classes="setting_setting"))
+        jog.mount(jog_grid)
+        yield jog
+
+
+class JogWidget(widgets.Static):
+    def compose(self) -> ComposeResult:
+        yield widgets.Static(f"-- JOG MODE ENABLED -- ")
+        yield widgets.Static(f"Press ESC to exit jog mode\n")
+
+        yield widgets.Static(f":arrow_left: and :arrow_right: to decrease/increase jog distance")
+        yield widgets.Static(f":arrow_up: and :arrow_down: to jog the selected device")
 
 
 class SettingsWidget(widgets.Static):
@@ -94,6 +115,12 @@ class Settings(InuHandler, App):
     CSS_PATH = "../../assets/settings.tcss"
     HB_MAX = 23
 
+    # IDs excluded from "making a change"
+    EXCLUDED_IDS = ["trg_code", "btn_jog_mode"]
+
+    JOG_DIST_STEPS = [1, 5, 10, 25, 100]
+    JOG_SPEED_STEPS = [2, 5, 10, 20, 50]
+
     def __init__(self, args: argparse.Namespace):
         super().__init__()
         self.args = args
@@ -108,6 +135,8 @@ class Settings(InuHandler, App):
         self.device_id = self.args.device_id[0]
         self.record = None
         self.saved = True
+        self.jog_mode = False
+        self.jog_index = 0
 
         self.hb_interval = None
         self.last_hb = None
@@ -122,7 +151,7 @@ class Settings(InuHandler, App):
     async def on_mount(self):
         await self.init()
 
-        await self.mount(widgets.Markdown(self.config_hint, classes="config_hint"))
+        await self.mount(widgets.Markdown(self.config_hint, id="config_hint"))
         await self.mount(widgets.Static("", classes="error_hint hidden"))
 
         w = []
@@ -131,13 +160,17 @@ class Settings(InuHandler, App):
             setting.set_value(getattr(self.record, config_name))
             w.append(setting)
 
-        container = widgets.Static()
+        container = widgets.Static(id="main_container")
         await container.mount(InfoWidget())
-        await container.mount(containers.ScrollableContainer(*w))
+        await container.mount(containers.ScrollableContainer(*w, id="settings_widget"))
+        await container.mount(JogWidget(id="jog_widget"))
         await self.mount(container)
 
         await self.subscribe_info()
         self.set_interval(0.2, self.hb_ticker)
+
+        if self.device_id[0:8] != "robotics":
+            self.get_widget_by_id("jog_controls").styles.display = "none"
 
         def set_saved():
             self.saved = True
@@ -174,6 +207,8 @@ class Settings(InuHandler, App):
         self.get_widget_by_id("stat_enabled").value = stat.enabled
         self.get_widget_by_id("stat_active").value = stat.active
         self.get_widget_by_id("stat_info").update(stat.status)
+
+        self.get_widget_by_id("btn_jog_mode").disabled = stat.enabled
 
     async def on_hb(self, msg: model.Message):
         """
@@ -225,21 +260,78 @@ class Settings(InuHandler, App):
             prog_bar.styles.margin = 0
             prog_bar.add_class("offline")
 
-    def _on_key(self, event: events.Key) -> None:
-        if event.key == "escape":
-            self.set_focus(None)
-        elif event.key == "up":
-            self.action_focus_previous()
-        elif event.key == "down":
-            self.action_focus_next()
+    async def _on_key(self, event: events.Key) -> None:
+        if self.jog_mode:
+            if event.key == "escape":
+                self.get_widget_by_id("btn_jog_mode").value = False
+                # self.set_jog_mode(False)
+            elif event.key == "up":
+                await self.do_jog(True)
+            elif event.key == "down":
+                await self.do_jog(False)
+            elif event.key == "left":
+                self.jog_index = max(0, self.jog_index - 1)
+                self.update_jog_hint()
+            elif event.key == "right":
+                self.jog_index = min(len(self.JOG_DIST_STEPS) - 1, self.jog_index + 1)
+                self.update_jog_hint()
+
+        else:
+            if event.key == "escape":
+                self.set_focus(None)
+            elif event.key == "up":
+                self.action_focus_previous()
+            elif event.key == "down":
+                self.action_focus_next()
+
+    async def do_jog(self, forward: bool):
+        distance = self.JOG_DIST_STEPS[self.jog_index] if forward else -self.JOG_DIST_STEPS[self.jog_index]
+
+        jog = Jog(
+            distance=distance,
+            speed=self.JOG_SPEED_STEPS[self.jog_index],
+            device_id=self.get_widget_by_id("jog_device").value,
+        )
+
+        await self.inu.nats.publish(
+            const.Subjects.fqs([const.Subjects.COMMAND, const.Subjects.COMMAND_JOG], f"central.{self.device_id}"),
+            jog.marshal()
+        )
+
+    def update_jog_hint(self):
+        self.get_widget_by_id("jog_distance").update(f"{self.JOG_DIST_STEPS[self.jog_index]} mm")
+        self.get_widget_by_id("jog_speed").update(f"{self.JOG_SPEED_STEPS[self.jog_index]} mm/s")
 
     @on(widgets.Input.Changed)
-    def on_input_changed(self, _) -> None:
+    def on_input_changed(self, event: widgets.Input.Changed) -> None:
+        if event.input.id in self.EXCLUDED_IDS or event.input.id is None:
+            return
+
         self.saved = False
 
     @on(widgets.Checkbox.Changed)
-    def on_checkbox_changed(self, _) -> None:
+    def on_checkbox_changed(self, event: widgets.Checkbox.Changed) -> None:
+        if event.checkbox.id == "btn_jog_mode":
+            self.set_jog_mode(event.checkbox.value)
+
+        if event.checkbox.id in self.EXCLUDED_IDS or event.checkbox.id is None:
+            return
+
         self.saved = False
+
+    def set_jog_mode(self, enabled: bool):
+        self.jog_mode = enabled
+
+        main_display = "none" if self.jog_mode else "block"
+        jog_display = "block" if self.jog_mode else "none"
+
+        self.get_widget_by_id("settings_widget").styles.display = main_display
+        self.get_widget_by_id("config_hint").styles.display = main_display
+
+        self.get_widget_by_id("jog_widget").styles.display = jog_display
+
+        if self.jog_mode:
+            self.set_focus(None)
 
     async def on_button_pressed(self, event: widgets.Button.Pressed) -> None:
         trg = Trigger()
