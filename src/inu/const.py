@@ -73,14 +73,20 @@ class Subjects:
     # {'enabled': bool, 'active': bool, 'status': str}
     STATUS = 'status'
 
-    # Base command, always requires a sub-command in the subject.
+    # Base command, always requires a sub-command in the subject
     COMMAND = 'cmd'
 
+    # Device has been activated, such as a button pressed or sensor trip
     # {'code': int}
     COMMAND_TRIGGER = 'trigger'
 
+    # Jog a robotics actuator/servo - typically sent to the device's 'central' subject
     # {'device': str, 'distance': int, 'speed': int}
     COMMAND_JOG = 'jog'
+
+    # Request a device perform an OTA update - must be sent to the device's 'central' subject
+    # {'version': int}
+    COMMAND_OTA = 'ota'
 
     # Heartbeats let a controller know that you're still alive and detect devices going offline
     # {'uptime': int64}

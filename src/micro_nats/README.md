@@ -19,8 +19,8 @@ Non-supported items coming soon.
 Architecture
 ------------
 This library avoids the use of Regular Expressions for both efficiency and minimal-dependency reasons. Protocol parsers
-therefor use
-the [string parsing](https://docs.nats.io/reference/reference-protocols/nats-protocol/nats-client-dev#deciding-on-a-parsing-strategy)
+therefor use the
+[string parsing](https://docs.nats.io/reference/reference-protocols/nats-protocol/nats-client-dev#deciding-on-a-parsing-strategy)
 strategy.
 
 Inboxes are created, pooled and recycled for both disposable req/rep queries and consumer subscriptions. This is

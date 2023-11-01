@@ -2,6 +2,25 @@ Inu-Py
 ======
 Python implementation of the Inu framework.
 
+The Inu framework is a set of communication protocols and applications for microcontrollers. The creates a closed
+network with self-contained communication, logging & alerting for automation systems including sensors & robotics.
+
+* [Device Communication](docs/Device_Communication.md)
+  * [Commands](docs/Commands.md)
+* [Hardware](docs/Hardware.md)
+* [Configuration](docs/Config.md)
+
+MicroNats
+=========
+The Inu framework uses NATS as its core, however as the microcontrollers are running MicroPython with a limited
+Python implementation, a custom NATS API has been created specifically for MicroPython.
+
+MicroNats is a JetStream-capable NATS client designed for MicroPython. While in its early stages this remains part of
+this project, however it is a stand-alone library capable of being used by itself and will eventually be split out of
+this project.
+
+See the [MicroNats README](src/micro_nats/README.md) for more.
+
 Inu CLI
 =======
 The `inu` CLI offers a range of utilities for working with the Inu environment.
