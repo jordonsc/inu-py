@@ -8,7 +8,7 @@ from textual.app import App, ComposeResult
 
 from inu import Inu, InuHandler, const, Status
 from inu.schema import settings, Heartbeat
-from inu.schema.command import Trigger, Jog
+from inu.schema.command import Trigger, Jog, Ota, Reboot
 from micro_nats import error as mn_error, model
 from micro_nats.jetstream.protocol.consumer import Consumer, ConsumerConfig
 from micro_nats.util import Time
@@ -17,16 +17,17 @@ from micro_nats.util import Time
 class InfoWidget(widgets.Static):
     def compose(self) -> ComposeResult:
         # Device status
-        stat = widgets.Static(classes="info_sub")
-        stat.mount(widgets.Static(f"Status", classes="setting_title"))
+        stat = widgets.Static(classes="info_sub", id="info_status")
+        stat.mount(widgets.Static(f"Status\n ", classes="setting_title"))
         stat.mount(widgets.Checkbox("Enabled", disabled=True, id="stat_enabled"))
         stat.mount(widgets.Checkbox("Active", disabled=True, id="stat_active"))
         stat.mount(widgets.Static("", id="stat_info"))
         yield stat
 
         # Device heartbeat
-        hb = widgets.Static(classes="info_sub")
-        hb.mount(widgets.Static("Heartbeat", classes="setting_title"))
+        hb = widgets.Static(classes="info_sub", id="info_hb")
+        hb = widgets.Static(classes="info_sub", id="info_hb")
+        hb.mount(widgets.Static("Heartbeat\n", classes="setting_title"))
         hb.mount(containers.Horizontal(
             widgets.Static(f" :heart: ", id="hb_heart"),
             widgets.Rule(id="hb_progress", line_style="heavy")
@@ -34,34 +35,49 @@ class InfoWidget(widgets.Static):
         yield hb
 
         # Send device commands
-        cmd = widgets.Static(classes="info_sub")
+        cmd = widgets.Static(classes="info_sub", id="info_cmd")
+        cmd.mount(widgets.Static("Command Dispatch", classes="setting_title"))
         cmd.mount(widgets.Button("Toggle Enabled", id="btn_enabled"))
         cmd.mount(widgets.Button("Send Trigger", id="btn_trigger"))
         cmd.mount(widgets.Input("0", validators=validation.Integer(minimum=0, maximum=99), id="trg_code"))
         cmd.mount(widgets.Button("Interrupt", id="btn_interrupt"))
         yield cmd
 
+        # Send OTA request
+        ota = widgets.Static(classes="info_sub", id="info_maintenance")
+        ota.mount(widgets.Static("Maintenance", classes="setting_title"))
+        ota.mount(widgets.Button("Begin OTA", id="btn_ota"))
+        ota.mount(widgets.Input("0", validators=validation.Integer(minimum=0, maximum=99), id="ota_version"))
+        ota.mount(widgets.Button("Reboot", id="btn_reboot"))
+        yield ota
+
         # Jog (robotics only)
-        jog = widgets.Static(classes="info_sub", id="jog_controls")
-        jog.mount(widgets.Static("Jog Controls", classes="setting_title"))
+        jog = widgets.Static(classes="info_sub", id="info_jog")
+        jog.mount(widgets.Static("Jog Controls\n", classes="setting_title"))
         jog.mount(widgets.Checkbox("Jog mode", id="btn_jog_mode"))
         jog.mount(widgets.Input("A0", id="jog_device"))
-        jog_grid = widgets.Static(id="jog_grid")
-        jog_grid.mount(widgets.Static("Distance", classes="setting_subtitle"))
-        jog_grid.mount(widgets.Static("1 mm", id="jog_distance", classes="setting_setting"))
-        jog_grid.mount(widgets.Static("Speed", classes="setting_subtitle"))
-        jog_grid.mount(widgets.Static("2 mm/s", id="jog_speed", classes="setting_setting"))
-        jog.mount(jog_grid)
         yield jog
 
 
 class JogWidget(widgets.Static):
     def compose(self) -> ComposeResult:
-        yield widgets.Static(f"-- JOG MODE ENABLED -- ")
-        yield widgets.Static(f"Press ESC to exit jog mode\n")
+        yield widgets.Markdown(f"# JOG MODE ENABLED")
+        container = widgets.Static("", classes="info_container")
+        container.mount(widgets.Static(f"Press ESC to exit jog mode"))
 
-        yield widgets.Static(f":arrow_left: and :arrow_right: to decrease/increase jog distance")
-        yield widgets.Static(f":arrow_up: and :arrow_down: to jog the selected device")
+        jog_grid = widgets.Static(id="jog_grid")
+        jog_grid.mount(widgets.Static("Device", classes="setting_subtitle"))
+        jog_grid.mount(widgets.Static("", id="jog_device_info", classes="setting_setting"))
+        jog_grid.mount(widgets.Static("Distance", classes="setting_subtitle"))
+        jog_grid.mount(widgets.Static("1 mm", id="jog_distance", classes="setting_setting"))
+        jog_grid.mount(widgets.Static("Speed", classes="setting_subtitle"))
+        jog_grid.mount(widgets.Static("2 mm/s", id="jog_speed", classes="setting_setting"))
+        container.mount(jog_grid)
+
+        container.mount(widgets.Static(f":arrow_left: and :arrow_right: to decrease/increase jog distance"))
+        container.mount(widgets.Static(f":arrow_up: and :arrow_down: to jog the selected device"))
+
+        yield container
 
 
 class SettingsWidget(widgets.Static):
@@ -116,7 +132,7 @@ class Settings(InuHandler, App):
     HB_MAX = 23
 
     # IDs excluded from "making a change"
-    EXCLUDED_IDS = ["trg_code", "btn_jog_mode"]
+    EXCLUDED_IDS = ["trg_code", "stat_enabled", "stat_active"]
 
     JOG_DIST_STEPS = [1, 5, 10, 25, 100]
     JOG_SPEED_STEPS = [2, 5, 10, 20, 50]
@@ -154,15 +170,16 @@ class Settings(InuHandler, App):
         await self.mount(widgets.Markdown(self.config_hint, id="config_hint"))
         await self.mount(widgets.Static("", classes="error_hint hidden"))
 
-        w = []
+        container = widgets.Static(id="main_container")
+        await container.mount(InfoWidget())
+
+        s_container = widgets.Static(id="settings_widget")
         for config_name, config in self.config.items():
             setting = SettingsWidget(config_name, config)
             setting.set_value(getattr(self.record, config_name))
-            w.append(setting)
+            await s_container.mount(setting)
 
-        container = widgets.Static(id="main_container")
-        await container.mount(InfoWidget())
-        await container.mount(containers.ScrollableContainer(*w, id="settings_widget"))
+        await container.mount(s_container)
         await container.mount(JogWidget(id="jog_widget"))
         await self.mount(container)
 
@@ -170,7 +187,7 @@ class Settings(InuHandler, App):
         self.set_interval(0.2, self.hb_ticker)
 
         if self.device_id[0:8] != "robotics":
-            self.get_widget_by_id("jog_controls").styles.display = "none"
+            self.get_widget_by_id("info_jog").styles.display = "none"
 
         def set_saved():
             self.saved = True
@@ -304,7 +321,7 @@ class Settings(InuHandler, App):
 
     @on(widgets.Input.Changed)
     def on_input_changed(self, event: widgets.Input.Changed) -> None:
-        if event.input.id in self.EXCLUDED_IDS or event.input.id is None:
+        if event.input.id in self.EXCLUDED_IDS or event.input.id is None or event.input.id[0:4] == "btn_":
             return
 
         self.saved = False
@@ -314,7 +331,7 @@ class Settings(InuHandler, App):
         if event.checkbox.id == "btn_jog_mode":
             self.set_jog_mode(event.checkbox.value)
 
-        if event.checkbox.id in self.EXCLUDED_IDS or event.checkbox.id is None:
+        if event.checkbox.id in self.EXCLUDED_IDS or event.checkbox.id is None or event.checkbox.id[0:4] == "btn_":
             return
 
         self.saved = False
@@ -325,13 +342,19 @@ class Settings(InuHandler, App):
         main_display = "none" if self.jog_mode else "block"
         jog_display = "block" if self.jog_mode else "none"
 
+        self.get_widget_by_id("jog_device_info").update(self.get_widget_by_id("jog_device").value)
+
         self.get_widget_by_id("settings_widget").styles.display = main_display
         self.get_widget_by_id("config_hint").styles.display = main_display
+        self.get_widget_by_id("info_maintenance").styles.display = main_display
+        self.get_widget_by_id("info_cmd").styles.display = main_display
+        self.get_widget_by_id("info_jog").styles.display = main_display
 
         self.get_widget_by_id("jog_widget").styles.display = jog_display
 
         if self.jog_mode:
             self.set_focus(None)
+            self.screen.scroll_to(0, 0, speed=100)
 
     async def on_button_pressed(self, event: widgets.Button.Pressed) -> None:
         trg = Trigger()
@@ -341,6 +364,26 @@ class Settings(InuHandler, App):
             trg.code = const.TriggerCode.INTERRUPT
         elif event.button.id == "btn_enabled":
             trg.code = const.TriggerCode.ENABLE_TOGGLE
+        elif event.button.id == "btn_ota":
+            # OTA has a special command code, not a trigger
+            ota = Ota()
+            ota.version = int(self.get_widget_by_id("ota_version").value)
+            await self.inu.nats.publish(
+                const.Subjects.fqs([const.Subjects.COMMAND, const.Subjects.COMMAND_OTA], f"central.{self.device_id}"),
+                ota.marshal()
+            )
+            return
+        elif event.button.id == "btn_reboot":
+            # Hard reboot
+            reboot = Reboot()
+            await self.inu.nats.publish(
+                const.Subjects.fqs([const.Subjects.COMMAND, const.Subjects.COMMAND_REBOOT],
+                                   f"central.{self.device_id}"),
+                reboot.marshal()
+            )
+            return
+        else:
+            return
 
         await self.inu.nats.publish(
             const.Subjects.fqs([const.Subjects.COMMAND, const.Subjects.COMMAND_TRIGGER], f"central.{self.device_id}"),

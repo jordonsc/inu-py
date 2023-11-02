@@ -33,8 +33,7 @@ class MotionApp(InuApp):
 
     async def app_init(self):
         self.pool.run(self.sensor.read_loop())
-
-        await self.inu.status(enabled=True)
+        await self.inu.status(enabled=True, active=False, status="")
 
     async def app_tick(self):
         def set_state(s):

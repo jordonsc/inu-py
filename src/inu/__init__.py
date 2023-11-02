@@ -43,6 +43,8 @@ class Inu(io.IoHandler):
         else:
             self.device_id = self.context.device_id
 
+        self.app_name = self.device_id.split(".")[0]
+
         if self.context.settings_class is not None and not issubclass(self.context.settings_class, Settings):
             raise error.BadRequest("Settings class is not a subclass of `Settings`")
 

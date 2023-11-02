@@ -3,7 +3,7 @@ Screen {
 }
 
 #main_container {
-    min-height: 55;
+    min-height: 68;
 }
 
 InfoWidget {
@@ -13,25 +13,35 @@ InfoWidget {
 }
 
 InfoWidget .setting_title {
+    height: auto;
+}
+
+.setting_title {
     color: cyan;
     padding-left: 2;
-    padding-bottom: 1;
     height: 2;
 }
 
-InfoWidget .setting_subtitle {
+.setting_subtitle {
     color: white;
     width: 13;
     padding-left: 1;
 }
 
-InfoWidget .setting_setting {
+.setting_setting {
     color: grey;
 }
 
-InfoWidget #jog_grid {
+.info_container {
+    border: solid red;
+    padding: 1;
+}
+
+#jog_grid {
     layout: grid;
-    grid-size: 2 2;
+    grid-size: 2 3;
+    width: 40;
+    margin: 3 0 3 2;
 }
 
 InfoWidget #btn_jog_mode {

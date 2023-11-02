@@ -1,4 +1,4 @@
-INU_BUILD = 14
+INU_BUILD = 19
 
 
 class LogLevel:
@@ -87,6 +87,10 @@ class Subjects:
     # Request a device perform an OTA update - must be sent to the device's 'central' subject
     # {'version': int}
     COMMAND_OTA = 'ota'
+
+    # Request the device perform a soft or hard reboot
+    # {}
+    COMMAND_REBOOT = 'reboot'
 
     # Heartbeats let a controller know that you're still alive and detect devices going offline
     # {'uptime': int64}

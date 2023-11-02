@@ -17,3 +17,7 @@ class Jog(Command):
 
 class Ota(Command):
     version: int = None
+
+
+class Reboot(Command):
+    pass

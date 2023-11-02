@@ -64,8 +64,12 @@ class Build(Utility):
             self.logger.error(f"App files for '{device_id[0]}' do not exist")
             exit(1)
 
-        cfg = self.create_config_file(device_id)
-        self.logger.info(f"Generated configuration:\n{cfg}")
+        if not self.args.ota:
+            cfg = self.create_config_file(device_id)
+            self.logger.info(f"Generated configuration:\n{cfg}")
+        else:
+            cfg = None
+            self.logger.info(f"Generating OTA package for {device_id[0]} v{const.INU_BUILD}")
 
         port = self.args.port
         self.state = State()
@@ -96,10 +100,13 @@ class Build(Utility):
 
         # Core app
         self.send_files(f"apps/{device_id[0]}")
-        with tempfile.NamedTemporaryFile('w') as fp:
-            fp.write(cfg)
-            fp.seek(0)
-            self.send_file(fp.name, "settings.json")
+
+        if not self.args.ota:
+            # Don't include the settings file in OTA updates
+            with tempfile.NamedTemporaryFile('w') as fp:
+                fp.write(cfg)
+                fp.seek(0)
+                self.send_file(fp.name, "settings.json")
 
         if self.args.settings:
             self.logger.info("New settings applied")
@@ -110,8 +117,9 @@ class Build(Utility):
         self.send_files("src/wifi", "wifi")
 
         # MicroPython libs
-        if self.ota_packet is None:
+        if not self.args.ota:
             self.mkdir("lib")
+
         mc = self.get_lib_root(short_form=True)
         self.send_file(f"{mc}/python-stdlib/base64/base64.py", "lib/base64.py")
         self.send_file(f"{mc}/python-stdlib/datetime/datetime.py", "lib/datetime.py")
@@ -288,7 +296,7 @@ class Build(Utility):
     def add_ota_file(self, src: str, dest: str):
         with open(src, "rb") as fp:
             content = fp.read()
-            self.ota_packet += struct.pack("<I", len(dest))
+            self.ota_packet += struct.pack("<H", len(dest))
             self.ota_packet += dest.encode()
             self.ota_packet += struct.pack("<I", len(content))
             self.ota_packet += content
