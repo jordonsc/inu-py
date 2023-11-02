@@ -1,16 +1,12 @@
 import asyncio
-import binascii
 import json
 import logging
-import struct
-import time
-
-import urequests as requests
 
 import machine
-from inu import InuHandler, Inu, const, Status
+from inu import InuHandler, Inu, const
 from inu.const import LogLevel
 from inu.schema.command import Ota, Trigger, Reboot
+from inu.updater import OtaUpdater
 from micro_nats import model
 from micro_nats.error import NotFoundError
 from micro_nats.jetstream.protocol import consumer
@@ -19,10 +15,6 @@ from wifi import Wifi, error as wifi_err
 
 
 class InuApp(InuHandler):
-    OTA_VERSION_URL = "https://storage.googleapis.com/inu-ota/{app}/version?v={v}"
-    OTA_BUILD_URL = "https://storage.googleapis.com/inu-ota/{app}/build-{version}.ota?v={v}"
-    OTA_CHECKSUM_URL = "https://storage.googleapis.com/inu-ota/{app}/build-{version}.checksum?v={v}"
-
     def __init__(self, settings_class: type):
         self.config = {}
         self.wifi = Wifi()
@@ -315,7 +307,9 @@ class InuApp(InuHandler):
             return
 
         await self.inu.js.msg.ack(msg)
-        await self.perform_ota_update(int(ota.version))
+
+        updater = OtaUpdater(self)
+        await updater.perform_update(int(ota.version))
 
     async def on_reboot(self, msg: model.Message):
         """
@@ -349,146 +343,3 @@ class InuApp(InuHandler):
         Clear up consumer cache.
         """
         self.listen_device_consumers = []
-
-    async def perform_ota_update(self, version: int):
-        """
-        Halts operations and downloads the specified OTA update before writing to the system.
-
-        If version is 0, the device will query for the latest version and use that.
-        """
-        if not self.allow_app_tick:
-            await self.inu.log(f"Ignoring OTA request while device is in maintenance mode")
-            return
-
-        # Wait for device to finish whatever its doing first
-        if self.inu.state.active:
-            await self.inu.log("OTA update requested, will initiate when idle")
-            while self.inu.state.active:
-                await asyncio.sleep(0.1)
-
-        original_state = Status(
-            enabled=self.inu.state.enabled,
-            active=self.inu.state.active,
-            status=self.inu.state.status
-        )
-        self.allow_app_tick = False
-
-        await self.inu.log(f"Applying OTA update for {self.inu.app_name} v{version}")
-        await self.inu.status(enabled=False, active=False, status="Applying OTA update")
-        await asyncio.sleep(0.25)  # allow messages to go out
-
-        try:
-            # Cache-busting
-            v = time.time()
-
-            # Version 0 means use the latest version, grab the latest from GCP -
-            if version == 0:
-                response = requests.get(url=self.OTA_VERSION_URL.format(app=self.inu.app_name, v=v))
-                if response.status_code != 200:
-                    await self.inu.log(f"Error getting latest app version: {response.status_code}", LogLevel.ERROR)
-                    await self.abort_ota(original_state)
-                    return
-                version = int(response.text)
-                if version <= 0:
-                    await self.inu.log(f"Malformed latest version: {version}", LogLevel.ERROR)
-                    await self.abort_ota(original_state)
-                    return
-                await self.inu.log(f"Latest version for {self.inu.app_name} determined to be {version}")
-
-            # This is prone to a high error rate, set a retry-loop -
-            err = None
-            for i in range(0, 15):
-                # Check checksum of OTA package
-                self.logger.info("Getting OTA packet checksum..")
-                response = requests.get(url=self.OTA_CHECKSUM_URL.format(app=self.inu.app_name, version=version, v=v))
-                if response.status_code != 200:
-                    err = f"Error downloading OTA checksum: {response.status_code}"
-                    self.logger.warning(err)
-                    continue
-                checksum = response.text
-
-                # Download OTA package into memory (should be ~ 250kb)
-                self.logger.info("Downloading OTA packet..")
-                response = requests.get(url=self.OTA_BUILD_URL.format(app=self.inu.app_name, version=version, v=v))
-                if response.status_code != 200:
-                    err = f"Error downloading OTA package: {response.status_code}"
-                    self.logger.warning(err)
-                    continue
-
-                # Validate checksum
-                self.logger.info(f"Validating checksum ({len(response.content)} bytes)..")
-                ota_checksum = "%08X" % (binascii.crc32(response.content) & 0xFFFFFFFF)
-                if ota_checksum != checksum:
-                    err = f"OTA checksum mismatch; expected: {checksum}, got: {ota_checksum}"
-                    self.logger.warning(err)
-                    continue
-
-                err = None
-                break
-
-            if isinstance(err, str):
-                await self.inu.log(err, LogLevel.ERROR)
-                await self.abort_ota(original_state)
-                return
-
-        except Exception as e:
-            await self.inu.log(f"OTA error - {type(e).__name__}: {e}", LogLevel.ERROR)
-            await self.abort_ota(original_state)
-            return
-
-        # BE CAREFUL moving around the response content, don't duplicate the memory profile
-        index = 0
-        package_version = struct.unpack("<I", response.content[index:index + 4])[0]
-        self.logger.info(f"OTA package version: {package_version}")
-        if package_version != version:
-            await self.inu.log(f"OTA package version error: expected {version}, got {package_version}", LogLevel.ERROR)
-            await self.abort_ota(original_state)
-            return
-
-        index += 4
-
-        def unpack_file():
-            nonlocal index, response
-
-            # Unpack filename
-            fn_len = struct.unpack("<H", response.content[index:index + 2])[0]
-            index += 2
-            fn = response.content[index:index + fn_len].decode()
-            index += fn_len
-
-            data_len = struct.unpack("<I", response.content[index:index + 4])[0]
-            index += 4
-
-            self.logger.info(f"OTA write: {fn} ({data_len} b)")
-
-            with open(fn, "wb") as fp:
-                fp.write(response.content[index:index + data_len])
-
-            index += data_len
-
-        try:
-            while index < len(response.content):
-                unpack_file()
-        except Exception as e:
-            await self.inu.log(
-                f"Error during OTA application - {type(e).__name__}: {e}; index: {index}",
-                LogLevel.FATAL
-            )
-            await self.abort_ota(original_state)
-            return
-
-        self.inu.state = original_state
-        await self.inu.status(status="OTA reboot")
-
-        await self.inu.log(f"OTA update applied, rebooting")
-        await asyncio.sleep(0.5)
-        machine.reset()
-
-    async def abort_ota(self, state: Status):
-        """
-        Resets the device state after an error early in the OTA process.
-        """
-        await self.inu.log("OTA update aborting, resuming device activity")
-        self.inu.state = state
-        await self.inu.status(status="")
-        self.allow_app_tick = True
