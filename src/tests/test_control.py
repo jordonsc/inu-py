@@ -6,7 +6,7 @@ from inu.hardware import robotics
 
 class TestControlCodes(unittest.TestCase):
     def test_controls(self):
-        controls = robotics.control_array_from_string("SEL A0; mv 800 300; w 2000 int; MOVE -800 150 INT")
+        controls = robotics.Robotics.control_array_from_string("SEL A0; mv 800 300; w 2000 int; MOVE -800 150 INT")
 
         self.assertEqual(4, len(controls))
 
@@ -30,10 +30,10 @@ class TestControlCodes(unittest.TestCase):
 
     def test_fail(self):
         with self.assertRaises(error.BadRequest):
-            robotics.control_from_string("INT MOVE 4000 200")
+            robotics.Robotics.control_from_string("INT MOVE 4000 200")
 
         with self.assertRaises(error.Malformed):
-            robotics.control_from_string("MOVE 4000 INT")
+            robotics.Robotics.control_from_string("MOVE 4000 INT")
 
         with self.assertRaises(error.BadRequest):
-            robotics.control_from_string("DANCE 500 100")
+            robotics.Robotics.control_from_string("DANCE 500 100")

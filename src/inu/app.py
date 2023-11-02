@@ -1,7 +1,9 @@
 import asyncio
+import binascii
 import json
 import logging
 import struct
+import time
 
 import urequests as requests
 
@@ -17,8 +19,9 @@ from wifi import Wifi, error as wifi_err
 
 
 class InuApp(InuHandler):
-    OTA_VERSION_URL = "https://storage.googleapis.com/inu-ota/{app}/version"
-    OTA_BUILD_URL = "https://storage.googleapis.com/inu-ota/{app}/build-{version}.ota"
+    OTA_VERSION_URL = "https://storage.googleapis.com/inu-ota/{app}/version?v={v}"
+    OTA_BUILD_URL = "https://storage.googleapis.com/inu-ota/{app}/build-{version}.ota?v={v}"
+    OTA_CHECKSUM_URL = "https://storage.googleapis.com/inu-ota/{app}/build-{version}.checksum?v={v}"
 
     def __init__(self, settings_class: type):
         self.config = {}
@@ -375,9 +378,12 @@ class InuApp(InuHandler):
         await asyncio.sleep(0.25)  # allow messages to go out
 
         try:
+            # Cache-busting
+            v = time.time()
+
             # Version 0 means use the latest version, grab the latest from GCP -
             if version == 0:
-                response = requests.get(url=self.OTA_VERSION_URL.format(app=self.inu.app_name))
+                response = requests.get(url=self.OTA_VERSION_URL.format(app=self.inu.app_name, v=v))
                 if response.status_code != 200:
                     await self.inu.log(f"Error getting latest app version: {response.status_code}", LogLevel.ERROR)
                     await self.abort_ota(original_state)
@@ -389,11 +395,39 @@ class InuApp(InuHandler):
                     return
                 await self.inu.log(f"Latest version for {self.inu.app_name} determined to be {version}")
 
-            # Download OTA package into memory (should be ~ 250kb)
-            # TODO: this needs a checksum validation
-            response = requests.get(url=self.OTA_BUILD_URL.format(app=self.inu.app_name, version=version))
-            if response.status_code != 200:
-                await self.inu.log(f"Error downloading OTA package: {response.status_code}", LogLevel.ERROR)
+            # This is prone to a high error rate, set a retry-loop -
+            err = None
+            for i in range(0, 15):
+                # Check checksum of OTA package
+                self.logger.info("Getting OTA packet checksum..")
+                response = requests.get(url=self.OTA_CHECKSUM_URL.format(app=self.inu.app_name, version=version, v=v))
+                if response.status_code != 200:
+                    err = f"Error downloading OTA checksum: {response.status_code}"
+                    self.logger.warning(err)
+                    continue
+                checksum = response.text
+
+                # Download OTA package into memory (should be ~ 250kb)
+                self.logger.info("Downloading OTA packet..")
+                response = requests.get(url=self.OTA_BUILD_URL.format(app=self.inu.app_name, version=version, v=v))
+                if response.status_code != 200:
+                    err = f"Error downloading OTA package: {response.status_code}"
+                    self.logger.warning(err)
+                    continue
+
+                # Validate checksum
+                self.logger.info(f"Validating checksum ({len(response.content)} bytes)..")
+                ota_checksum = "%08X" % (binascii.crc32(response.content) & 0xFFFFFFFF)
+                if ota_checksum != checksum:
+                    err = f"OTA checksum mismatch; expected: {checksum}, got: {ota_checksum}"
+                    self.logger.warning(err)
+                    continue
+
+                err = None
+                break
+
+            if isinstance(err, str):
+                await self.inu.log(err, LogLevel.ERROR)
                 await self.abort_ota(original_state)
                 return
 

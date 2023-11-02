@@ -1,4 +1,5 @@
 import argparse
+import binascii
 import glob
 import json
 import logging
@@ -115,6 +116,7 @@ class Build(Utility):
         self.send_files("src/inu", "inu")
         self.send_files("src/micro_nats", "micro_nats")
         self.send_files("src/wifi", "wifi")
+        self.send_files("src/util", "util")
 
         # MicroPython libs
         if not self.args.ota:
@@ -130,21 +132,31 @@ class Build(Utility):
             mpremote.do_disconnect(self.state, MpArgs())
 
         if self.ota_packet:
+            self.logger.info("Generating package checksum..")
+            checksum = "%08X" % (binascii.crc32(self.ota_packet) & 0xFFFFFFFF)
+
             self.logger.info("Transmitting OTA package..")
             with open(self.local_dir + f"build-{const.INU_BUILD}.ota", "wb") as fp:
                 fp.write(self.ota_packet)
-            self.send_ota_package(device_id[0])
+
+            self.send_ota_package(device_id[0], checksum)
 
         self.logger.info("Done")
 
-    def send_ota_package(self, app_code: str):
+    def send_ota_package(self, app_code: str, checksum: str):
         client = storage.Client.from_service_account_json(f"{self.root_dir}/config/ota-service-account.json")
         bucket = client.get_bucket(self.OTA_BUCKET)
 
         ota_object = bucket.blob(f"{app_code}/build-{const.INU_BUILD}.ota")
+        ota_object.cache_control = None
         ota_object.upload_from_filename(self.local_dir + f"build-{const.INU_BUILD}.ota")
 
+        checksum_object = bucket.blob(f"{app_code}/build-{const.INU_BUILD}.checksum")
+        checksum_object.cache_control = None
+        checksum_object.upload_from_string(checksum)
+
         version_object = bucket.blob(f"{app_code}/version")
+        version_object.cache_control = None
         version_object.upload_from_string(str(const.INU_BUILD).encode())
 
     def create_config_file(self, device_id) -> str:
