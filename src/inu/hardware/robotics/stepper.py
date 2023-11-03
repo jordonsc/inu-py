@@ -5,6 +5,8 @@ from ..robotics import RoboticsDevice, Move
 from machine import Pin, PWM
 import time
 
+from ..switch import Switch
+
 
 class StepperDriver:
     def __init__(self, pulse, direction, enabled):
@@ -36,8 +38,15 @@ class Stepper(RoboticsDevice):
 
     # Required time remaining in an operation (in nanoseconds) to allow yielding CPU
     MIN_SLEEP_TIME = 0.5 * 10 ** 9  # 0.5 seconds
+    MIN_GPIO_TIME = 0.05 * 10 ** 9  # 0.05 seconds
 
-    def __init__(self, driver: StepperDriver, screw: LeadScrew, allow_sleep: bool = True):
+    def __init__(self,
+                 driver: StepperDriver,
+                 screw: LeadScrew,
+                 fwd_stop: Switch = None,
+                 rev_stop: Switch = None,
+                 allow_sleep: bool = True
+                 ):
         """
         `allow_sleep` will allow the device to yield CPU if there is more than MIN_SLEEP_TIME nanoseconds remaining in
         the operation.
@@ -48,6 +57,9 @@ class Stepper(RoboticsDevice):
         self.driver.pulse.off()
         self.driver.direction.off()
         self.driver.enabled.off()
+
+        self.fwd_stop = fwd_stop
+        self.rev_stop = rev_stop
 
         self.allow_sleep = allow_sleep
 
@@ -90,13 +102,15 @@ class Stepper(RoboticsDevice):
 
         distance:  distance to move the actuator in mm
         speed:     speed to move the actuator in mm/s
-        direction: direction of stepper motor
+        direction: direction of stepper motor, 1 == "forward"
 
         CAUTION: do not drive immediately after a high-speed drive, or change rotation back-to-back.
                  a delay of 0.2s is recommended.
 
         If the driver isn't enabled, it will be enabled. Does not disable upon completion.
         """
+        fwd = direction == 1
+
         # Flip the direction if the screw direction is reversed
         direction = int(not (self.screw.forward ^ direction))
 
@@ -113,8 +127,18 @@ class Stepper(RoboticsDevice):
         pwm = PWM(self.driver.pulse, freq=pps, duty=512)
 
         # Do NOT use sleep - this must be as dead accurate as possible
-        while time.time_ns() - start_time < op_time:
-            if self.allow_sleep and time.time_ns() - start_time > self.MIN_SLEEP_TIME:
+        while True:
+            rem_time = time.time_ns() - start_time
+            if rem_time >= op_time:
+                break
+
+            if rem_time >= self.MIN_GPIO_TIME:
+                if fwd and self.fwd_stop and self.fwd_stop.check_state():
+                    break
+                if not fwd and self.rev_stop and self.rev_stop.check_state():
+                    break
+
+            if self.allow_sleep and rem_time > self.MIN_SLEEP_TIME:
                 # allow other tasks to run if we have more than MIN_SLEEP_TIME ns remaining
                 await asyncio.sleep(0)
 
