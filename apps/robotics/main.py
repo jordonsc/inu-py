@@ -4,6 +4,7 @@ from inu import error, const, Status
 from inu.app import InuApp
 from inu.const import LogLevel, Priority
 from inu.hardware.robotics import Robotics, stepper
+from inu.hardware.switch import Switch, SwitchMode
 from inu.schema.command import Jog
 from inu.schema.settings.robotics import Robotics as RoboSettings
 from micro_nats.error import NotFoundError
@@ -38,6 +39,22 @@ class RoboticsApp(InuApp):
         for device_id, spec in devices.items():
             device_type = device_cfg(spec, ["type"])
             if device_type == stepper.Stepper.CONFIG_CODE:
+                # limit switches
+                fwd_sw = None
+                rev_sw = None
+
+                es = device_cfg(spec, ["end_stops"])
+                if es:
+                    if "forward" in es:
+                        fwd_sw = Switch(
+                            pin=device_cfg(es, ["forward", "pin"], 36),
+                            mode=device_cfg(es, ["forward", "mode"], SwitchMode.NO),
+                        )
+                        rev_sw = Switch(
+                            pin=device_cfg(es, ["reverse", "pin"], 14),
+                            mode=device_cfg(es, ["reverse", "mode"], SwitchMode.NO),
+                        )
+
                 self.robotics.add_device(device_id, stepper.Stepper(
                     stepper.StepperDriver(
                         pulse=device_cfg(spec, ["driver", "pulse_pin"], 33),
@@ -50,6 +67,8 @@ class RoboticsApp(InuApp):
                         screw_lead=device_cfg(spec, ["screw", "screw_lead"], 5),
                         forward=device_cfg(spec, ["screw", "forward"], 1),
                     ),
+                    fwd_sw,
+                    rev_sw,
                 ))
 
     async def app_init(self):

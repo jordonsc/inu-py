@@ -6,12 +6,17 @@ class SwitchMode:
     NC = "NC"
 
 
+class PullMode:
+    PULL_DOWN = 1
+    PULL_UP = 2
+
+
 class Switch:
-    def __init__(self, pin: int, mode: str = SwitchMode.NO, on_change: callable = None):
+    def __init__(self, pin: int, pull: int = PullMode.PULL_DOWN, mode: str = SwitchMode.NO, on_change: callable = None):
         """
         If the `mode` is NC, then an active current on the pin will be considered "off".
         """
-        self.pin = Pin(pin, Pin.IN)
+        self.pin = Pin(pin, Pin.IN, pull=pull)
         self.state = None
         self.on_change = on_change
         self.reversed = mode == SwitchMode.NC

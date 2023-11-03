@@ -133,9 +133,11 @@ class Stepper(RoboticsDevice):
                 break
 
             if rem_time >= self.MIN_GPIO_TIME:
-                if fwd and self.fwd_stop and self.fwd_stop.check_state():
+                if fwd and self.fwd_stop and await self.fwd_stop.check_state():
+                    print("fwd stop break")
                     break
-                if not fwd and self.rev_stop and self.rev_stop.check_state():
+                if not fwd and self.rev_stop and await self.rev_stop.check_state():
+                    print("rev stop break")
                     break
 
             if self.allow_sleep and rem_time > self.MIN_SLEEP_TIME:

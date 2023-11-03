@@ -149,9 +149,8 @@ class Pin:
     OUT = 0  # Pin mode for output
     IN = 1  # Pin mode for input
 
-    PULL_UP = 1  # Enable pull-up resistor
-    PULL_DOWN = 2  # Enable pull-down resistor
-    OPEN_DRAIN = 3  # Set pin to open-drain mode
+    PULL_DOWN = 1
+    PULL_UP = 2
 
     def __init__(self, pin, mode, pull=None):
         """
