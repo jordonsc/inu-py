@@ -90,15 +90,18 @@ class RoboticsApp(InuApp):
             if stat.enabled and not stat.active:
                 await self.inu.log("Previous state is idle; starting enabled")
                 await self.inu.status(enabled=True, active=False, status="")
+                self.robotics.set_power(True)
             else:
                 await self.inu.log("Unsafe to start enabled; starting disabled", LogLevel.WARNING)
                 await self.inu.alert("Unsafe robotics power-up; calibration required", Priority.P3)
                 await self.inu.status(enabled=False, active=False, status="Pending calibration")
+                self.robotics.set_power(False)
 
         except NotFoundError:
             # No previous state found, start disabled and expect calibration
             await self.inu.log("No prior state found; starting disabled", LogLevel.WARNING)
             await self.inu.status(enabled=False, active=False, status="Safe start")
+            self.robotics.set_power(False)
 
     async def app_tick(self):
         pass
