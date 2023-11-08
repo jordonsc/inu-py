@@ -52,7 +52,7 @@ class MotionApp(InuApp):
         elif self.state == self.SensorState.ACTIVE:
             # Sensor must return to normal before allowing it to return to idle state
             if not motion:
-                await self.inu.deactivate(const.Strings.COOLDOWN)
+                await self.inu.activate(const.Strings.COOLDOWN)
                 set_state(self.SensorState.COOLDOWN)
 
         elif self.state == self.SensorState.COOLDOWN:

@@ -146,10 +146,13 @@ class RoboticsApp(InuApp):
                 await self.robotics.run(ctrl)
 
                 if self.inu.settings.cooldown_time:
-                    await self.inu.deactivate(const.Strings.COOLDOWN)
-                    await asyncio.sleep(self.inu.settings.cooldown_time)
+                    self.logger.info(f"Begin cooldown: {self.inu.settings.cooldown_time}")
+                    await self.inu.activate(const.Strings.COOLDOWN)
+                    await asyncio.sleep(self.inu.settings.cooldown_time / 1000)
+                    self.logger.info("Cooldown complete")
 
                 await self.inu.deactivate()
+                await self.inu.log(f"Sequence complete")
 
             except Exception as e:
                 await self.inu.log(f"Exception in robotics execution - {type(e).__name__}: {e}", LogLevel.ERROR)
