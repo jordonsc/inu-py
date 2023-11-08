@@ -123,6 +123,13 @@ class Stepper(RoboticsDevice):
         pps = self.pulse_rate_from_speed(speed)
         op_time = distance / speed * 10 ** 9
 
+        # Don't even start the stepper if the limiter is already triggered
+        if fwd and self.fwd_stop and await self.fwd_stop.check_state():
+            return
+
+        if not fwd and self.rev_stop and await self.rev_stop.check_state():
+            return
+
         start_time = time.time_ns()
         pwm = PWM(self.driver.pulse, freq=pps, duty=512)
 
@@ -134,10 +141,8 @@ class Stepper(RoboticsDevice):
 
             if rem_time >= self.MIN_GPIO_TIME:
                 if fwd and self.fwd_stop and await self.fwd_stop.check_state():
-                    print("fwd stop break")
                     break
                 if not fwd and self.rev_stop and await self.rev_stop.check_state():
-                    print("rev stop break")
                     break
 
             if self.allow_sleep and rem_time > self.MIN_SLEEP_TIME:

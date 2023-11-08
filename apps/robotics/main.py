@@ -77,6 +77,14 @@ class RoboticsApp(InuApp):
         s = "" if len(self.robotics.devices) == 1 else "s"
         self.logger.info(f"Robotics initialised with {len(self.robotics.devices)} device{s}")
 
+        # Calibration settings
+        cal_seq = self.get_config(["robotics", "calibration", "sequence"])
+        always_cal = self.get_config(["robotics", "calibration", "always_calibrate"], False)
+
+        if always_cal and cal_seq:
+            await self.run_calibration(cal_seq)
+            return
+
         # We'll decide if we power up enabled by checking the previous device state and determining if it is safe -
         try:
             last_status = await self.inu.js.msg.get_last(
@@ -86,22 +94,32 @@ class RoboticsApp(InuApp):
             )
 
             stat = Status(last_status.get_payload())
-            # If we were ENABLED but not ACTIVE (eg idle), then we'll allow powering-up enabled
+            # If we were ENABLED but not ACTIVE (eg idle), then we'll allow powering-up enabled (otherwise calibrate)
             if stat.enabled and not stat.active:
                 await self.inu.log("Previous state is idle; starting enabled")
                 await self.inu.status(enabled=True, active=False, status="")
                 self.robotics.set_power(True)
             else:
-                await self.inu.log("Unsafe to start enabled; starting disabled", LogLevel.WARNING)
-                await self.inu.alert("Unsafe robotics power-up; calibration required", Priority.P3)
-                await self.inu.status(enabled=False, active=False, status="Pending calibration")
-                self.robotics.set_power(False)
+                if cal_seq:
+                    # Auto calibration
+                    await self.run_calibration(cal_seq)
+                else:
+                    # Cannot calibrate - user input required
+                    await self.inu.log("Unsafe to start enabled; starting disabled", LogLevel.WARNING)
+                    await self.inu.alert("Unsafe robotics power-up; calibration required", Priority.P3)
+                    await self.inu.status(enabled=False, active=False, status="Pending calibration")
+                    self.robotics.set_power(False)
 
         except NotFoundError:
-            # No previous state found, start disabled and expect calibration
-            await self.inu.log("No prior state found; starting disabled", LogLevel.WARNING)
-            await self.inu.status(enabled=False, active=False, status="Safe start")
-            self.robotics.set_power(False)
+            # No previous state found
+            if cal_seq:
+                # Auto calibration
+                await self.run_calibration(cal_seq)
+            else:
+                # Cannot calibrate - user input required
+                await self.inu.log("No prior state found; starting disabled", LogLevel.WARNING)
+                await self.inu.status(enabled=False, active=False, status="Safe start")
+                self.robotics.set_power(False)
 
     async def app_tick(self):
         pass
@@ -211,6 +229,27 @@ class RoboticsApp(InuApp):
             self.inu.log(f"Error jogging - {type(e).__name__}: {e}", LogLevel.ERROR)
             if not acked:
                 await self.inu.js.msg.nack(msg)
+
+    async def run_calibration(self, seq):
+        """
+        Runs provided calibration sequence and configures device status according to calibration success.
+        """
+        await self.inu.log("Calibrating..")
+        try:
+            await self.inu.activate(f"Calibrating")
+            await asyncio.sleep(0.1)
+            await self.robotics.run(seq)
+            await asyncio.sleep(0.1)
+            await self.inu.deactivate()
+
+            await self.inu.log("Calibration success")
+            await self.inu.status(enabled=True, active=False, status="")
+            self.robotics.set_power(True)
+
+        except Exception as e:
+            await self.inu.log(f"Exception in robotics calibration - {type(e).__name__}: {e}", LogLevel.ERROR)
+            await self.inu.status(enabled=False, active=False, status="Calibration failed")
+            self.robotics.set_power(False)
 
 
 if __name__ == "__main__":
