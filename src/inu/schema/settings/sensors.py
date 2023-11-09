@@ -6,7 +6,7 @@ class TriggerDevice(Settings, CooldownDevice):
     A device that sends a trigger command.
     """
     trigger_code: int = 0
-    trigger_code_hint: str = "Code to include in the trigger; may correlate to a sequence code"
+    trigger_code_hint: str = "Default `code` to include in the trigger; may correlate to a sequence or special `code`"
 
 
 class MotionSensor(TriggerDevice):
@@ -35,3 +35,28 @@ class RangeTrigger(TriggerDevice):
     wait_delay: int = 0
     wait_delay_hint: str = "Time in ms the range must be under the max_distance value before triggering"
     wait_delay_min: int = 0
+
+
+class MultiSwitch(TriggerDevice):
+    """
+    ## A device with one or more physical switches.
+
+    Override code of -1 uses the default code.
+    """
+    sw_0: int = -1
+    sw_0_hint: str = "Switch 0 override code"
+
+    sw_1: int = -1
+    sw_1_hint: str = "Switch 1 override code"
+
+    sw_2: int = -1
+    sw_2_hint: str = "Switch 2 override code"
+
+    sw_3: int = -1
+    sw_3_hint: str = "Switch 3 override code"
+
+    sw_4: int = -1
+    sw_4_hint: str = "Switch 4 override code"
+
+    sw_5: int = -1
+    sw_5_hint: str = "Switch 5 override code"

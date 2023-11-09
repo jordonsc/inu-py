@@ -22,7 +22,7 @@ class RelayApp(InuApp):
         self.relay.off()
 
     async def app_init(self):
-        await self.inu.status(enabled=True, active=False, status="")
+        await self.set_state_from_last(True)
 
     async def app_tick(self):
         if self.trigger_start is not None and (

@@ -76,6 +76,8 @@ def get_device_settings_class(dvc: str) -> type:
         return robotics.Robotics
     elif dvc == DeviceType.RELAY:
         return Relay
+    elif dvc == DeviceType.SWITCH:
+        return sensors.MultiSwitch
     else:
         raise error.UnsupportedDeviceType(f"Unsupported device type: {dvc}")
 

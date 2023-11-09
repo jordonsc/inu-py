@@ -3,7 +3,7 @@ import json
 import logging
 
 import machine
-from inu import InuHandler, Inu, const
+from inu import InuHandler, Inu, const, Status
 from inu.const import LogLevel
 from inu.schema.command import Ota, Trigger, Reboot
 from inu.updater import OtaUpdater
@@ -344,3 +344,22 @@ class InuApp(InuHandler):
         Clear up consumer cache.
         """
         self.listen_device_consumers = []
+
+    async def set_state_from_last(self, default: bool = True):
+        """
+        Sets the device state from the last known state.
+
+        If there is no last known state, use the `default` value. Intended for device start-up.
+        """
+        try:
+            last_status = await self.inu.js.msg.get_last(
+                const.Streams.STATUS,
+                const.Subjects.fqs(const.Subjects.STATUS, self.inu.device_id)
+
+            )
+
+            stat = Status(last_status.get_payload())
+            await self.inu.status(enabled=stat.enabled, active=False, status="")
+
+        except NotFoundError:
+            await self.inu.status(enabled=default, active=False, status="")

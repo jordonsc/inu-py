@@ -1,4 +1,4 @@
-INU_BUILD = 26
+INU_BUILD = 27
 
 
 class LogLevel:
@@ -25,6 +25,9 @@ class DeviceType:
 
     # On-off or timer switch - can be triggered by sensors, etc
     RELAY = "relay"
+
+    # Physical switch(es)
+    SWITCH = "switch"
 
     # Motion, light, distance, etc sensors
     MOTION = "motion"
