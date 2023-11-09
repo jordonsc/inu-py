@@ -78,6 +78,8 @@ class Schema:
 
 class Heartbeat(Schema):
     interval: int = None
+    build: int = None
+    local_addr: str = None
 
 
 class Log(Schema):

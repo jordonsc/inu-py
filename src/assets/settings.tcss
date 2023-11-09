@@ -3,7 +3,7 @@ Screen {
 }
 
 #main_container {
-    min-height: 68;
+    min-height: 71;
 }
 
 InfoWidget {
@@ -14,10 +14,10 @@ InfoWidget {
 
 InfoWidget .setting_title {
     height: auto;
+    color: cyan;
 }
 
 .setting_title {
-    color: cyan;
     padding-left: 2;
     height: 2;
 }
@@ -141,4 +141,14 @@ Markdown {
 
 .hidden {
     display: none;
+}
+
+#dvc_build {
+    padding: 1 0 0 1;
+    color: lightgrey;
+}
+
+#dvc_address {
+    padding: 0 0 0 1;
+    color: lightgrey;
 }

@@ -26,12 +26,13 @@ class InfoWidget(widgets.Static):
 
         # Device heartbeat
         hb = widgets.Static(classes="info_sub", id="info_hb")
-        hb = widgets.Static(classes="info_sub", id="info_hb")
         hb.mount(widgets.Static("Heartbeat\n", classes="setting_title"))
         hb.mount(containers.Horizontal(
             widgets.Static(f" :heart: ", id="hb_heart"),
             widgets.Rule(id="hb_progress", line_style="heavy")
         ))
+        hb.mount(widgets.Static("", id="dvc_build"))
+        hb.mount(widgets.Static("", id="dvc_address"))
         yield hb
 
         # Send device commands
@@ -238,6 +239,8 @@ class Settings(InuHandler, App):
         self.last_hb = time.time()
         self.get_widget_by_id("hb_heart").add_class("beat")
         self.get_widget_by_id("hb_progress").styles.width = 0
+        self.get_widget_by_id("dvc_build").update(f"Build: {hb.build}")
+        self.get_widget_by_id("dvc_address").update(f"Addr:  {hb.local_addr}")
 
         def hb_done():
             self.get_widget_by_id("hb_heart").remove_class("beat")

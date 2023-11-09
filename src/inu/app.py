@@ -110,6 +110,7 @@ class InuApp(InuHandler):
             return False
 
         ifcfg = self.wifi.ifconfig()
+        self.inu.local_address = ifcfg.ip
         print(f"  IP:      {ifcfg.ip}")
         print(f"  Subnet:  {ifcfg.subnet}")
         print(f"  Gateway: {ifcfg.gateway}")

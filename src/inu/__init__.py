@@ -38,6 +38,9 @@ class Inu(io.IoHandler):
         self.hb_task = None
         self.state = Status(enabled=False, active=False, status="")
 
+        # Update this with LAN address for heartbeats
+        self.local_address = ""
+
         if isinstance(self.context.device_id, list):
             self.device_id = ".".join(self.context.device_id)
         else:
@@ -149,7 +152,7 @@ class Inu(io.IoHandler):
                     interval = int(self.settings.heartbeat_interval)
 
                 if time.time() - last_beat >= interval:
-                    hb = Heartbeat(interval=interval)
+                    hb = Heartbeat(interval=interval, build=const.INU_BUILD, local_addr=self.local_address)
 
                     try:
                         self.logger.debug("beat")

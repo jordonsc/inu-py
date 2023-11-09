@@ -1,4 +1,4 @@
-INU_BUILD = 25
+INU_BUILD = 26
 
 
 class LogLevel:
@@ -93,7 +93,8 @@ class Subjects:
     COMMAND_REBOOT = 'reboot'
 
     # Heartbeats let a controller know that you're still alive and detect devices going offline
-    # {'uptime': int64}
+    # Includes your build version and LAN IP address
+    # {'uptime': int64, 'build': int, 'local_addr': str}
     HEARTBEAT = 'hb'
 
     # Settings define a device's configuration
