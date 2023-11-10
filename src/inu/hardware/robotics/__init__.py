@@ -66,6 +66,12 @@ class Select(Control):
         """
         return self.args[0]
 
+    def allow_interrupt(self) -> bool:
+        """
+        Select Controls have no concept of interrupts but should not block the interrupt chain.
+        """
+        return True
+
     def __repr__(self):
         return f"SEL {self.get_device()}"
 
@@ -143,17 +149,28 @@ class RoboticsDevice:
     Base class for a physical device controller. Must be able to execute Control actions.
     """
 
-    async def execute(self, ctrl: Control):
+    def __init__(self):
+        self.interrupted = False
+
+    async def execute(self, ctrl: Control, reverse: bool = False):
         """
         Run a control code. Non-tangible controls like SEL and WAIT will not be sent to a RoboticsDevice.
+
+        `reverse` will undo a Control operation, while also ignoring further interrupts.
         """
-        pass
+        self.interrupted = False
 
     def set_power(self, powered: bool):
         """
         Powers or un-powers the device. May do nothing depending on if the device has a passive power state.
         """
         pass
+
+    def interrupt(self):
+        """
+        Inform an active operation that it has been interrupted, expecting it to reverse action already taken and abort.
+        """
+        self.interrupted = True
 
 
 class Robotics:
@@ -163,8 +180,16 @@ class Robotics:
 
     def __init__(self):
         self.devices = {}
-        self.active_device = None
         self.logger = logging.getLogger("inu.robotics")
+
+        # Currently selected device (eg "A0")
+        self.active_device = None
+
+        # If the current operation has been interrupted
+        self.interrupted = False
+
+        # If the current operation _allows_ interruption
+        self.allow_interrupt = False
 
     def add_device(self, device_id: str, controller: RoboticsDevice):
         """
@@ -189,19 +214,42 @@ class Robotics:
         for device in self.devices.values():
             device.set_power(powered)
 
-    async def run(self, ctrl_list: str):
+    async def run(self, ctrl_str: str):
         """
         Run a control code string.
         """
-        control_list = self.control_array_from_string(ctrl_list)
+        self.reset_state()
+        await self.run_list(self.control_array_from_string(ctrl_str))
+
+        self.logger.info(f"Sequence complete")
+        self.reset_state()
+
+    async def run_list(self, control_list: list):
+        """
+        Run a list of operations.
+        """
+        int_chain = []
+        last_sel = None
 
         for ctrl in control_list:
             self.logger.info(f"EXEC: {ctrl}")
             await asyncio.sleep(0)
 
+            if ctrl.allow_interrupt():
+                int_chain.append(ctrl)
+                self.allow_interrupt = True
+            else:
+                int_chain.clear()
+                self.allow_interrupt = False
+
+                if last_sel:
+                    # Important: we need to remember the last select for reversing
+                    int_chain.append(last_sel)
+
             # Non-tangible codes -
             if isinstance(ctrl, Select):
                 self.select_device(ctrl)
+                last_sel = ctrl
             elif isinstance(ctrl, Wait):
                 await asyncio.sleep(ctrl.get_time() / 1000)
             elif ctrl is None:
@@ -213,7 +261,85 @@ class Robotics:
 
                 await self.devices[self.active_device].execute(ctrl)
 
-        self.logger.info(f"Sequence complete")
+            if self.interrupted:
+                # Run the int_chain in reverse order..
+                self.reset_state()
+                self.logger.info("Reversing ops..")
+                await self.run_int_list(int_chain)
+
+                # then run it again in normal order
+                self.reset_state()
+                self.logger.info("Replaying interrupted ops..")
+                await self.run_list(int_chain)
+                self.logger.info("INT seq completed")
+
+    def reset_state(self):
+        """
+        Clears device state from a previous run.
+        """
+        self.active_device = None
+        self.interrupted = False
+        self.allow_interrupt = False
+
+    async def run_int_list(self, control_list: list):
+        """
+        Runs a list of operations in reverse order and direction.
+        """
+        for ctrl in self.prepare_int_list(control_list):
+            self.logger.info(f"REV EXEC: {ctrl}")
+            await asyncio.sleep(0)
+
+            # Non-tangible codes -
+            if isinstance(ctrl, Select):
+                self.select_device(ctrl)
+            elif isinstance(ctrl, Wait):
+                await asyncio.sleep(ctrl.get_time() / 1000)
+            elif ctrl is None:
+                pass
+            else:
+                # Tangible codes need to be sent to the active RoboticsDevice
+                if self.active_device is None:
+                    raise error.BadRequest("Missing SEL in INT list")
+
+                await self.devices[self.active_device].execute(ctrl, reverse=True)
+
+    def prepare_int_list(self, control_list: list):
+        """
+        Reverse the list, moving SEL statements to the front of their controls.
+
+        Skips Wait controls.
+        """
+        int_list = []
+        buffer = []
+        # Skip the last element as that would have been partially completed and already reversed
+        for ctrl in reversed(control_list[:-1]):
+            if isinstance(ctrl, Select):
+                int_list.append(ctrl)
+                int_list += buffer
+                buffer = []
+            elif isinstance(ctrl, Wait) or ctrl is None:
+                pass
+            else:
+                buffer.append(ctrl)
+
+        if len(buffer) > 0:
+            self.logger.warning("INT list has no preceding SEL")
+            int_list += buffer
+
+        return int_list
+
+    def interrupt(self) -> bool:
+        """
+        Interrupt the current operation, halting and reversing.
+
+        Returns True if the interrupt was accepted.
+        """
+        if self.active_device and self.allow_interrupt:
+            self.interrupted = True
+            self.devices[self.active_device].interrupt()
+            return True
+        else:
+            return False
 
     @staticmethod
     def control_from_string(ctrl: str) -> Control:

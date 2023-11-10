@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 from . import Control
 from ..robotics import RoboticsDevice, Move
@@ -15,13 +16,10 @@ class StepperDriver:
         self.enabled = Pin(enabled, Pin.OUT)
 
 
-class LeadScrew:
-    def __init__(self, steps_per_rev: int = 1600, microstepping: int = 8, screw_lead: int = 8, forward: int = 1):
+class Screw:
+    def __init__(self, steps_per_rev: int = 1600, screw_lead: int = 8, forward: int = 1):
         # Number of steps per revolution
         self.steps_per_rev = steps_per_rev
-
-        # Number of microsteps in a step
-        self.microsteps = microstepping
 
         # Screw lead (distance actuator moves for 1 rotation)
         self.screw_lead = screw_lead
@@ -30,27 +28,38 @@ class LeadScrew:
         self.forward = forward
 
     def __repr__(self):
-        return f"steps/rev: {self.steps_per_rev}; microsteps: {self.microsteps}; lead: {self.screw_lead}"
+        return f"steps/rev: {self.steps_per_rev}; lead: {self.screw_lead}"
 
 
-class Stepper(RoboticsDevice):
+class Actuator(RoboticsDevice):
+    """
+    Moves an actuator forward or backwards.
+
+    Supports undoing partial operations on interrupt.
+    """
+
     CONFIG_CODE = "stepper"
 
     # Required time remaining in an operation (in nanoseconds) to allow yielding CPU
-    MIN_SLEEP_TIME = 0.5 * 10 ** 9  # 0.5 seconds
-    MIN_GPIO_TIME = 0.05 * 10 ** 9  # 0.05 seconds
+    MIN_SLEEP_TIME = 0.25 * 10 ** 9  # 0.25 seconds
+    MIN_GPIO_TIME = 0.01 * 10 ** 9  # 0.01 seconds
 
-    def __init__(self,
-                 driver: StepperDriver,
-                 screw: LeadScrew,
-                 fwd_stop: Switch = None,
-                 rev_stop: Switch = None,
-                 allow_sleep: bool = True
-                 ):
+    # It is important to delay a small amount in order to allow a clean finish to the PWM signal after stopping the
+    # stepper. If you don't do this, and start another PWM signal immediately, it might cause the driver to overload.
+    SAFE_WAIT_TIME = 0.01
+
+    # Time to pause when interrupted before reversing
+    INT_PAUSE_TIME = 0.5
+
+    def __init__(self, driver: StepperDriver, screw: Screw, fwd_stop: Switch = None, rev_stop: Switch = None,
+                 allow_sleep: bool = True):
         """
         `allow_sleep` will allow the device to yield CPU if there is more than MIN_SLEEP_TIME nanoseconds remaining in
         the operation.
         """
+        super().__init__()
+        self.logger = logging.getLogger("inu.robotics.actuator")
+
         self.driver = driver
         self.screw = screw
 
@@ -62,6 +71,9 @@ class Stepper(RoboticsDevice):
         self.rev_stop = rev_stop
 
         self.allow_sleep = allow_sleep
+
+        # Displacement of last operation
+        self.displacement = 0
 
     def on(self):
         """
@@ -96,7 +108,7 @@ class Stepper(RoboticsDevice):
         """
         return round(speed / self.screw.screw_lead * self.screw.steps_per_rev)
 
-    async def drive(self, distance: float, speed: float = 10, direction: int = 1):
+    async def drive(self, distance: float, speed: float = 10, direction: int = 1, ignore_int=False):
         """
         Move the actuator by a given distance.
 
@@ -122,6 +134,7 @@ class Stepper(RoboticsDevice):
 
         pps = self.pulse_rate_from_speed(speed)
         op_time = distance / speed * 10 ** 9
+        self.displacement = 0
 
         # Don't even start the stepper if the limiter is already triggered
         if fwd and self.fwd_stop and await self.fwd_stop.check_state():
@@ -133,29 +146,53 @@ class Stepper(RoboticsDevice):
         start_time = time.time_ns()
         pwm = PWM(self.driver.pulse, freq=pps, duty=512)
 
-        # Do NOT use sleep - this must be as dead accurate as possible
+        # Do NOT use sleep when we're close to reaching `op_time` - this must be as dead accurate as possible
         while True:
-            rem_time = time.time_ns() - start_time
-            if rem_time >= op_time:
+            run_time = time.time_ns() - start_time
+            rem_time = op_time - run_time
+
+            # Operation completed
+            if run_time >= op_time:
                 break
 
+            # An interrupt signal has been received, we need to stop and reverse the action
+            if not ignore_int and self.interrupted:
+                # We'll exit cleanly and the caller can deal with the reverse op
+                self.logger.info("Interrupted")
+                break
+
+            # If we have sufficient time, we'll check the GPIO pins for the end-stops
             if rem_time >= self.MIN_GPIO_TIME:
                 if fwd and self.fwd_stop and await self.fwd_stop.check_state():
                     break
                 if not fwd and self.rev_stop and await self.rev_stop.check_state():
                     break
 
+            # We'll only allow a sleep if we have a safe amount of time remaining before cut-off
             if self.allow_sleep and rem_time > self.MIN_SLEEP_TIME:
-                # allow other tasks to run if we have more than MIN_SLEEP_TIME ns remaining
+                # Allow other tasks to run if we have more than MIN_SLEEP_TIME ns remaining
                 await asyncio.sleep(0)
 
         pwm.deinit()
+        self.displacement = (run_time * speed) / (10 ** 9)
+        await asyncio.sleep(self.SAFE_WAIT_TIME)
 
-    async def execute(self, ctrl: Control):
+    async def execute(self, ctrl: Control, reverse: bool = False):
+        await super().execute(ctrl)
+
         if isinstance(ctrl, Move):
-            direction = int(ctrl.get_distance() >= 0)
+            if reverse:
+                direction = int(ctrl.get_distance() < 0)
+            else:
+                direction = int(ctrl.get_distance() >= 0)
+
             distance = abs(ctrl.get_distance())
-            await self.drive(distance, ctrl.get_speed(), direction)
+            await self.drive(distance, ctrl.get_speed(), direction, ignore_int=reverse)
+
+            if not reverse and self.interrupted:
+                await asyncio.sleep(self.INT_PAUSE_TIME)
+                self.logger.info(f"Interrupt reverse for {self.displacement} mm")
+                await self.drive(self.displacement, ctrl.get_speed(), int(not bool(direction)), ignore_int=True)
 
     def __repr__(self):
         return f"Stepper <{self.screw}>"

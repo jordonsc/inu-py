@@ -12,12 +12,8 @@ class Robotics(Settings, ActionDevice, CooldownDevice):
         W <TIME> [INT]                Pause for TIME milliseconds
         ```
 
-    If "INT" is appended to the command, it will allow a break signal to reset the operation. For a wait command this
-    would reset the timer. For a move command, it would reverse the action, pause and then resume.
-
-    The default INT 'pause' time is 1000ms. Currently this is non-configurable.
-
-    A break signal is provided by sending a TRIGGER with `code` 100.
+    If "INT" is appended to the command, it will allow an interrupt trigger (code 100) to reset the operation. INT
+    operations may be chained, the full chain will be reversed and eventually replayed.
 
     Example:
         SEL A0; MV 800 300; W 2000 INT; MV -800 150 INT

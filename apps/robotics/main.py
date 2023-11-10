@@ -3,7 +3,7 @@ import asyncio
 from inu import error, const, Status
 from inu.app import InuApp
 from inu.const import LogLevel, Priority
-from inu.hardware.robotics import Robotics, stepper
+from inu.hardware.robotics import Robotics, actuator
 from inu.hardware.switch import Switch, SwitchMode
 from inu.schema.command import Jog
 from inu.schema.settings.robotics import Robotics as RoboSettings
@@ -38,7 +38,7 @@ class RoboticsApp(InuApp):
 
         for device_id, spec in devices.items():
             device_type = device_cfg(spec, ["type"])
-            if device_type == stepper.Stepper.CONFIG_CODE:
+            if device_type == actuator.Actuator.CONFIG_CODE:
                 # limit switches
                 fwd_sw = None
                 rev_sw = None
@@ -55,15 +55,14 @@ class RoboticsApp(InuApp):
                             mode=device_cfg(es, ["reverse", "mode"], SwitchMode.NO),
                         )
 
-                self.robotics.add_device(device_id, stepper.Stepper(
-                    stepper.StepperDriver(
+                self.robotics.add_device(device_id, actuator.Actuator(
+                    actuator.StepperDriver(
                         pulse=device_cfg(spec, ["driver", "pulse_pin"], 33),
                         direction=device_cfg(spec, ["driver", "direction_pin"], 38),
                         enabled=device_cfg(spec, ["driver", "enabled_pin"], 8),
                     ),
-                    stepper.LeadScrew(
+                    actuator.Screw(
                         steps_per_rev=device_cfg(spec, ["screw", "steps_per_rev"], 1600),
-                        microstepping=device_cfg(spec, ["screw", "microstepping"], 8),
                         screw_lead=device_cfg(spec, ["screw", "screw_lead"], 5),
                         forward=device_cfg(spec, ["screw", "forward"], 1),
                     ),
@@ -156,6 +155,16 @@ class RoboticsApp(InuApp):
 
             except Exception as e:
                 await self.inu.log(f"Exception in robotics execution - {type(e).__name__}: {e}", LogLevel.ERROR)
+
+    async def on_interrupt(self):
+        """
+        A listen-device has published an interrupt code.
+        """
+        if self.inu.state.active:
+            if self.robotics.interrupt():
+                self.logger.info("Interrupting operation")
+            else:
+                self.logger.info("Cannot interrupt")
 
     async def on_enabled_changed(self, enabled: bool):
         """
