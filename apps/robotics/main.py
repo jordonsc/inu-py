@@ -66,6 +66,7 @@ class RoboticsApp(InuApp):
                         screw_lead=device_cfg(spec, ["screw", "screw_lead"], 5),
                         forward=device_cfg(spec, ["screw", "forward"], 1),
                     ),
+                    device_cfg(spec, ["safe_wait"]),
                     fwd_sw,
                     rev_sw,
                 ))

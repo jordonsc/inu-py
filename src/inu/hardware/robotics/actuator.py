@@ -42,17 +42,12 @@ class Actuator(RoboticsDevice):
 
     # Required time remaining in an operation (in nanoseconds) to allow yielding CPU
     MIN_SLEEP_TIME = 0.25 * 10 ** 9  # 0.25 seconds
-    MIN_GPIO_TIME = 0.01 * 10 ** 9  # 0.01 seconds
-
-    # It is important to delay a small amount in order to allow a clean finish to the PWM signal after stopping the
-    # stepper. If you don't do this, and start another PWM signal immediately, it might cause the driver to overload.
-    SAFE_WAIT_TIME = 0.01
 
     # Time to pause when interrupted before reversing
     INT_PAUSE_TIME = 0.5
 
-    def __init__(self, driver: StepperDriver, screw: Screw, fwd_stop: Switch = None, rev_stop: Switch = None,
-                 allow_sleep: bool = True):
+    def __init__(self, driver: StepperDriver, screw: Screw, safe_wait: int = 250, fwd_stop: Switch = None,
+                 rev_stop: Switch = None, allow_sleep: bool = True):
         """
         `allow_sleep` will allow the device to yield CPU if there is more than MIN_SLEEP_TIME nanoseconds remaining in
         the operation.
@@ -66,6 +61,11 @@ class Actuator(RoboticsDevice):
         self.driver.pulse.off()
         self.driver.direction.off()
         self.driver.enabled.off()
+
+        # It is important to delay a small amount in order to allow a clean finish to the PWM signal after stopping the
+        # stepper. If you don't do this, and start another PWM signal immediately, it might cause the driver to
+        # overload. The higher the steps/rev, the lower this value can be.
+        self.safe_wait_time = safe_wait
 
         self.fwd_stop = fwd_stop
         self.rev_stop = rev_stop
@@ -135,6 +135,8 @@ class Actuator(RoboticsDevice):
         pps = self.pulse_rate_from_speed(speed)
         op_time = distance / speed * 10 ** 9
         self.displacement = 0
+        self.logger.info(f"Op time: {op_time * 10 ** -9}")
+        self.logger.info(f"Safe wait: {self.safe_wait_time / 1000}")
 
         # Don't even start the stepper if the limiter is already triggered
         if fwd and self.fwd_stop and await self.fwd_stop.check_state():
@@ -162,11 +164,10 @@ class Actuator(RoboticsDevice):
                 break
 
             # If we have sufficient time, we'll check the GPIO pins for the end-stops
-            if rem_time >= self.MIN_GPIO_TIME:
-                if fwd and self.fwd_stop and await self.fwd_stop.check_state():
-                    break
-                if not fwd and self.rev_stop and await self.rev_stop.check_state():
-                    break
+            if fwd and self.fwd_stop and await self.fwd_stop.check_state():
+                break
+            if not fwd and self.rev_stop and await self.rev_stop.check_state():
+                break
 
             # We'll only allow a sleep if we have a safe amount of time remaining before cut-off
             if self.allow_sleep and rem_time > self.MIN_SLEEP_TIME:
@@ -175,7 +176,8 @@ class Actuator(RoboticsDevice):
 
         pwm.deinit()
         self.displacement = (run_time * speed) / (10 ** 9)
-        await asyncio.sleep(self.SAFE_WAIT_TIME)
+        print("safe wait")
+        await asyncio.sleep(self.safe_wait_time / 1000)
 
     async def execute(self, ctrl: Control, reverse: bool = False):
         await super().execute(ctrl)
