@@ -327,7 +327,7 @@ class InuApp(InuHandler):
         self.allow_app_tick = False
 
         await self.inu.log(f"Performing reboot by external request", LogLevel.WARNING)
-        await self.inu.status(status="Performing reboot")
+        await self.inu.status(status="Rebooting")
         await asyncio.sleep(0.5)
         machine.reset()
 

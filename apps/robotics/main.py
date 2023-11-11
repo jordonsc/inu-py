@@ -66,7 +66,7 @@ class RoboticsApp(InuApp):
                         screw_lead=device_cfg(spec, ["screw", "screw_lead"], 5),
                         forward=device_cfg(spec, ["screw", "forward"], 1),
                     ),
-                    device_cfg(spec, ["safe_wait"]),
+                    device_cfg(spec, ["safe_wait"], 250),
                     fwd_sw,
                     rev_sw,
                 ))
@@ -78,10 +78,8 @@ class RoboticsApp(InuApp):
         self.logger.info(f"Robotics initialised with {len(self.robotics.devices)} device{s}")
 
         # Calibration settings
-        cal_seq = self.get_config(["robotics", "calibration", "sequence"])
-        always_cal = self.get_config(["robotics", "calibration", "always_calibrate"], False)
-
-        if always_cal and cal_seq:
+        cal_seq = self.inu.settings.cal_seq.strip()
+        if cal_seq and cal_seq[0] != "#":
             await self.run_calibration(cal_seq)
             return
 

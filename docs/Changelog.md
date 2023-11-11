@@ -1,6 +1,8 @@
 ### Build 28
 * Added interrupt paths to robotics
-* Switches & sensors can now repeat triggers when continuously active
+* Robotics now calibrate via settings, not hardware config
+* Switches can now repeat triggers when continuously active
+* Switches no longer have an unused cooldown time
 
 ### Build 27
 * Added Switch application

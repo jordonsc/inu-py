@@ -23,6 +23,9 @@ class Robotics(Settings, ActionDevice, CooldownDevice):
         Wait 2 seconds
         Move in reverse direction 800 mm at 150 mm/s
     """
+    cal_seq: str = ""
+    cal_seq_hint: str = "Calibration sequence when first initialising"
+
     seq_0: str = "SEL A0; MV 800 300; W 2000; MV -800 150"
     seq_0_hint: str = "Sequence 0 control codes"
 

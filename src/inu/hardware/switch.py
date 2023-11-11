@@ -1,3 +1,5 @@
+import time
+
 from machine import Pin
 
 
@@ -20,6 +22,7 @@ class Switch:
         self.state = None
         self.on_change = on_change
         self.reversed = mode == SwitchMode.NC
+        self.active_time = None
 
     async def check_state(self) -> bool:
         """
@@ -35,7 +38,22 @@ class Switch:
 
         if state != self.state:
             self.state = state
+
+            if state:
+                self.active_time = time.time()
+            else:
+                self.active_time = None
+
             if self.on_change:
                 await self.on_change(self.state)
 
         return self.state
+
+    def get_active_time(self):
+        """
+        Returns the time the device has been active for, in seconds.
+        """
+        if not self.active_time:
+            return 0
+
+        return time.time() - self.active_time

@@ -176,7 +176,6 @@ class Actuator(RoboticsDevice):
 
         pwm.deinit()
         self.displacement = (run_time * speed) / (10 ** 9)
-        print("safe wait")
         await asyncio.sleep(self.safe_wait_time / 1000)
 
     async def execute(self, ctrl: Control, reverse: bool = False):
