@@ -142,26 +142,35 @@ class InuApp(InuHandler):
 
         Checkup on wifi, NATS connection, etc. Will call `app_tick()` inside the main loop.
         """
-        if not await self.init():
-            self.logger.error("Init failed. Rebooting.")
-            await asyncio.sleep(1)
+        try:
+            if not await self.init():
+                self.logger.error("Init failed. Rebooting.")
+                await asyncio.sleep(1)
+                machine.reset()
+
+            await self.app_init()
+
+            while True:
+                if not self.wifi.is_connected():
+                    self.wifi.connect()
+                    await self.wifi.wait_for_connect()
+
+                    if not self.wifi.is_connected():
+                        # If we have persistent wifi issues, do a full reboot
+                        machine.reset()
+
+                if self.allow_app_tick:
+                    try:
+                        await self.app_tick()
+                    except Exception as e:
+                        await self.inu.log(f"Application error - {type(e).__name__}: {e}")
+                        await asyncio.sleep(1)
+
+                await asyncio.sleep(0.01)
+
+        finally:
+            # Reset on uncaught exception
             machine.reset()
-
-        await self.app_init()
-
-        while True:
-            if not self.wifi.is_connected():
-                self.wifi.connect()
-                await self.wifi.wait_for_connect()
-
-            if self.allow_app_tick:
-                try:
-                    await self.app_tick()
-                except Exception as e:
-                    await self.inu.log(f"Application error - {type(e).__name__}: {e}")
-                    await asyncio.sleep(1)
-
-            await asyncio.sleep(0.01)
 
     async def app_tick(self):
         """

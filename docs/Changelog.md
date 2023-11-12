@@ -3,6 +3,7 @@
 * Robotics now calibrate via settings, not hardware config
 * Switches can now repeat triggers when continuously active
 * Switches no longer have an unused cooldown time
+* Device will reboot on uncaught exception or wifi issues
 
 ### Build 27
 * Added Switch application
