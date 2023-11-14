@@ -1,3 +1,6 @@
+### Build 29
+* Added `Locked` to device status
+
 ### Build 28
 * Added interrupt paths to robotics
 * Robotics now calibrate via settings, not hardware config

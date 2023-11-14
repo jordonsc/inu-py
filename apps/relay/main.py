@@ -33,6 +33,10 @@ class RelayApp(InuApp):
             await self.relay.off()
 
     async def on_trigger(self, code: int):
+        if not self.inu.state.can_act(allow_active=True):
+            self.logger.info(f"Ignoring trigger: {self.inu.state}")
+            return
+
         if code == 1:
             # Turn the relay on, disable any timers
             self.trigger_start = None

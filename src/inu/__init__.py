@@ -36,7 +36,7 @@ class Inu(io.IoHandler):
         self.pool = TaskPool()
         self.has_settings = False
         self.hb_task = None
-        self.state = Status(enabled=False, active=False, status="")
+        self.state = Status(enabled=False, locked=False, active=False, status="")
 
         # Update this with LAN address for heartbeats
         self.local_address = ""
@@ -189,7 +189,7 @@ class Inu(io.IoHandler):
         except Exception as e:
             self.logger.error(f"Command error: {type(e).__name__}: {str(e)}")
 
-    async def status(self, active: bool = None, status: str = None, enabled: bool = None):
+    async def status(self, active: bool = None, status: str = None, enabled: bool = None, locked: bool = None):
         """
         Update and publish the current device state.
         """
@@ -199,6 +199,8 @@ class Inu(io.IoHandler):
             self.state.status = status
         if enabled is not None:
             self.state.enabled = enabled
+        if locked is not None:
+            self.state.locked = locked
 
         self.logger.debug(f"Device state: {self.state}")
 

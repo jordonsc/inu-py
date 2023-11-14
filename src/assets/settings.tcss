@@ -3,7 +3,7 @@ Screen {
 }
 
 #main_container {
-    min-height: 71;
+    min-height: 77;
 }
 
 InfoWidget {

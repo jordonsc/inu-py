@@ -123,8 +123,8 @@ class RoboticsApp(InuApp):
         pass
 
     async def on_trigger(self, code: int):
-        if self.inu.state.active:
-            await self.inu.log("Ignoring trigger while active")
+        if not self.inu.state.can_act():
+            self.logger.info(f"Ignoring trigger: {self.inu.state}")
             return
 
         # Actionable sequence codes range from seq_0 to seq_5

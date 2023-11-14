@@ -45,7 +45,11 @@ class SwitchApp(InuApp):
 
             # Force all devices to be considered "off" if we've disabled the device
             if self.inu.state.enabled:
-                new_state = await sw.check_state()
+                if self.inu.state.locked:
+                    # Locked - don't change state (except for disabling)
+                    new_state = last_state
+                else:
+                    new_state = await sw.check_state()
             else:
                 new_state = False
                 sw.state = False

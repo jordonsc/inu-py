@@ -198,12 +198,20 @@ class InuApp(InuHandler):
             if self.inu.state.enabled:
                 await self.inu.deactivate()
                 await self.on_enabled_changed(False)
+        elif code == const.TriggerCode.LOCK_TOGGLE:
+            await self.inu.status(locked=not self.inu.state.locked)
+            await self.on_lock_changed(self.inu.state.locked)
+        elif code == const.TriggerCode.LOCK_ON:
+            if not self.inu.state.locked:
+                await self.inu.status(locked=True)
+                await self.on_lock_changed(True)
+        elif code == const.TriggerCode.LOCK_OFF:
+            if self.inu.state.locked:
+                await self.inu.status(locked=False)
+                await self.on_lock_changed(False)
         else:
             # Normal triggers can only execute when enabled
-            if self.inu.state.enabled:
-                await self.on_trigger(code)
-            else:
-                await self.inu.log("Ignoring trigger while disabled")
+            await self.on_trigger(code)
 
     async def on_settings_updated(self):
         """
@@ -343,6 +351,12 @@ class InuApp(InuHandler):
     async def on_enabled_changed(self, enabled: bool):
         """
         Device enabled status was changed by a listen-device.
+        """
+        pass
+
+    async def on_lock_changed(self, enabled: bool):
+        """
+        Device locked status was changed by a listen-device.
         """
         pass
 

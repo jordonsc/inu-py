@@ -20,6 +20,7 @@ class InfoWidget(widgets.Static):
         stat = widgets.Static(classes="info_sub", id="info_status")
         stat.mount(widgets.Static(f"Status\n ", classes="setting_title"))
         stat.mount(widgets.Checkbox("Enabled", disabled=True, id="stat_enabled"))
+        stat.mount(widgets.Checkbox("Locked", disabled=True, id="stat_locked"))
         stat.mount(widgets.Checkbox("Active", disabled=True, id="stat_active"))
         stat.mount(widgets.Static("", id="stat_info"))
         yield stat
@@ -39,8 +40,9 @@ class InfoWidget(widgets.Static):
         cmd = widgets.Static(classes="info_sub", id="info_cmd")
         cmd.mount(widgets.Static("Command Dispatch", classes="setting_title"))
         cmd.mount(widgets.Button("Toggle Enabled", id="btn_enabled"))
+        cmd.mount(widgets.Button("Toggle Locked", id="btn_locked"))
         cmd.mount(widgets.Button("Send Trigger", id="btn_trigger"))
-        cmd.mount(widgets.Input("0", validators=validation.Integer(minimum=0, maximum=99), id="trg_code"))
+        cmd.mount(widgets.Input("0", validators=validation.Integer(minimum=0, maximum=9999), id="trg_code"))
         cmd.mount(widgets.Button("Interrupt", id="btn_interrupt"))
         yield cmd
 
@@ -89,13 +91,14 @@ class SettingsWidget(widgets.Static):
         self.setting_type = cfg_type
 
         self.hint_widget = widgets.Static(f"<{cfg_type}> {cfg_hint}", classes="setting_hint")
+        id = f"setting_{setting_name}"
 
         if cfg_type == "int":
-            self.input_widget = widgets.Input(validators=validation.Integer(minimum=cfg_min, maximum=cfg_max))
+            self.input_widget = widgets.Input(validators=validation.Integer(minimum=cfg_min, maximum=cfg_max), id=id)
         elif cfg_type == "bool":
-            self.input_widget = widgets.Checkbox("False")
+            self.input_widget = widgets.Checkbox("False", id=id)
         else:
-            self.input_widget = widgets.Input(validators=[])
+            self.input_widget = widgets.Input(validators=[], id=id)
 
     def compose(self) -> ComposeResult:
         yield widgets.Static(f"{self.setting_name}", classes="setting_title")
@@ -133,7 +136,7 @@ class Settings(InuHandler, App):
     HB_MAX = 23
 
     # IDs excluded from "making a change"
-    EXCLUDED_IDS = ["trg_code", "stat_enabled", "stat_active"]
+    EXCLUDED_IDS = ["trg_code", "stat_enabled", "stat_locked", "stat_active"]
 
     JOG_DIST_STEPS = [1, 5, 10, 25, 100]
     JOG_SPEED_STEPS = [2, 5, 10, 20, 50]
@@ -223,6 +226,7 @@ class Settings(InuHandler, App):
 
         stat = Status(msg.get_payload())
         self.get_widget_by_id("stat_enabled").value = stat.enabled
+        self.get_widget_by_id("stat_locked").value = stat.locked
         self.get_widget_by_id("stat_active").value = stat.active
         self.get_widget_by_id("stat_info").update(stat.status)
 
@@ -367,6 +371,8 @@ class Settings(InuHandler, App):
             trg.code = const.TriggerCode.INTERRUPT
         elif event.button.id == "btn_enabled":
             trg.code = const.TriggerCode.ENABLE_TOGGLE
+        elif event.button.id == "btn_locked":
+            trg.code = const.TriggerCode.LOCK_TOGGLE
         elif event.button.id == "btn_ota":
             # OTA has a special command code, not a trigger
             ota = Ota()
@@ -420,7 +426,7 @@ class Settings(InuHandler, App):
                 self.record = cls()
 
             self.config_hint, self.config = settings.get_config_for_device(dvc_id[0])
-            self.title = f"Settings // {self.device_id}"
+            self.title = f"I . N . U  -  {self.device_id}"
         except ValueError:
             self.exit(return_code=1, message=f"Unknown device type ({dvc_id[0]}) for provided device ID.")
             return 3

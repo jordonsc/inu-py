@@ -135,8 +135,7 @@ class Actuator(RoboticsDevice):
         pps = self.pulse_rate_from_speed(speed)
         op_time = distance / speed * 10 ** 9
         self.displacement = 0
-        self.logger.info(f"Op time: {op_time * 10 ** -9}")
-        self.logger.info(f"Safe wait: {self.safe_wait_time / 1000}")
+        self.logger.info(f"Op time: {round(op_time * 10 ** -9, 2)}; safe-wait: {self.safe_wait_time / 1000}")
 
         # Don't even start the stepper if the limiter is already triggered
         if fwd and self.fwd_stop and await self.fwd_stop.check_state():

@@ -1,4 +1,4 @@
-INU_BUILD = 28
+INU_BUILD = 29
 
 
 class LogLevel:
@@ -142,9 +142,14 @@ class Streams:
 
 class TriggerCode:
     INTERRUPT = 100
+
     ENABLE_TOGGLE = 110
     ENABLE_ON = 111
     ENABLE_OFF = 112
+
+    LOCK_TOGGLE = 115
+    LOCK_ON = 116
+    LOCK_OFF = 117
 
 
 class Strings:
