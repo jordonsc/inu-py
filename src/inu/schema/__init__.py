@@ -98,7 +98,7 @@ class Log(Schema):
 
 
 class Alert(Schema):
-    priority: Priority = None
+    priority: int = None
     message: str = None
 
     def _validate(self):

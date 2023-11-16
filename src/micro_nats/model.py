@@ -199,6 +199,7 @@ class Message:
         self.stream_seq: int | None = None
         self.consumer_seq: int | None = None
         self.time: str | None = None
+        self.time_ns: int | None = None
 
         if msg is None:
             self.payload = None
@@ -238,6 +239,7 @@ class Message:
             return
 
         self.time = Time.format_msg_timestamp(parts[-2])
+        self.time_ns = int(parts[-2])
         self.consumer_seq = int(parts[-3])
         self.stream_seq = int(parts[-4])
 

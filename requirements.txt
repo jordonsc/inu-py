@@ -4,3 +4,4 @@ mpremote
 aiohttp
 aiofiles
 gcloud
+requests
