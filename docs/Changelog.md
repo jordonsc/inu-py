@@ -1,3 +1,6 @@
+### Build 30
+* Relay device now logs status change
+
 ### Build 29
 * Added `Locked` to device status
 

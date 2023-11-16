@@ -59,6 +59,7 @@ class RelayApp(InuApp):
 
     async def on_state_change(self, active: bool):
         await self.inu.status(enabled=True, active=active, status='ON' if active else 'OFF')
+        await self.inu.log(f"Set state: {'ON' if active else 'OFF'}")
 
 
 if __name__ == "__main__":
