@@ -209,7 +209,7 @@ class Sentry(InuHandler):
             msg.time_ns,
             json.dumps({
                 "device_id": device_id,
-                "settings": msg.get_payload().decode(),
+                "settings": msg.from_json(),
             }),
             {
                 "device_id": device_id,
@@ -230,7 +230,7 @@ class Sentry(InuHandler):
             json.dumps({
                 "device_id": device_id,
                 "command": cmd,
-                "payload": msg.get_payload().decode(),
+                "payload": msg.from_json(),
             }),
             {
                 "device_id": device_id,
