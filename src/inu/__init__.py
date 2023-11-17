@@ -240,7 +240,7 @@ class Inu(io.IoHandler):
         except Exception as e:
             self.logger.error(f"Log error: {type(e).__name__}: {str(e)}")
 
-    async def alert(self, message: str, priority: const.Priority = const.Priority.P3):
+    async def alert(self, message: str, priority: int = const.Priority.P3):
         """
         Create an alert, designed for human intervention.
 

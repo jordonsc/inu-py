@@ -4,7 +4,8 @@
         "engine": "loki",
         "target": "http://localhost:3100/loki/api/v1/push"
     },
-    "pager": {
-        "engine": "pagerduty"
+    "alerter": {
+        "engine": "pagerduty",
+        "key": "574936d1d9964208c01cf5cf867be89a"
     }
 }

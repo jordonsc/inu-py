@@ -13,7 +13,7 @@ from micro_nats import error as mn_error, model
 from micro_nats.jetstream.error import ErrorResponseException
 from micro_nats.jetstream.protocol.consumer import Consumer, ConsumerConfig
 from micro_nats.util import Time
-from sentry import logger as sentry_logger
+from sentry import logger as sentry_logger, alerter as sentry_alerter
 
 
 class Device:
@@ -29,7 +29,7 @@ class Device:
         if self.last_heartbeat is None:
             return False
 
-        return time.monotonic() - self.last_heartbeat > (self.heartbeat_freq / 1000 * missed)
+        return (time.monotonic() - self.last_heartbeat) > (self.heartbeat_freq * missed)
 
     def beat(self):
         """
@@ -39,9 +39,12 @@ class Device:
 
 
 class Sentry(InuHandler):
+    MISSED_HEARTBEATS_ALARM = 5
+    DEFAULT_PRIORITY = 3
 
     def __init__(self, args: argparse.Namespace):
         self.sentry_logger: sentry_logger.Logger | None = None
+        self.sentry_alerter: sentry_alerter.Alerter | None = None
         self.config = {}
 
         self.logger = logging.getLogger('inu.sentry')
@@ -79,6 +82,13 @@ class Sentry(InuHandler):
         else:
             self.logger.warning("No known logger configured")
 
+        # Create an alert engine from config
+        alert_engine = self.get_config(["alerter", "engine"])
+        if alert_engine == "pagerduty":
+            self.sentry_alerter = sentry_alerter.PagerDuty(self.get_config("alerter"))
+        else:
+            self.logger.warning("No known alerter configured")
+
     def get_config(self, key: str | list, default=None):
         """
         Get a setting from the local config, or return the default.
@@ -103,9 +113,26 @@ class Sentry(InuHandler):
 
         try:
             while True:
+                await self.check_heartbeats()
                 await asyncio.sleep(0.1)
         except asyncio.exceptions.CancelledError:
             pass
+
+    async def check_heartbeats(self):
+        """
+        Iterates each known device and checks if their heartbeat has expired.
+
+        If it has, it will raise an alert and remove the device from the pool.
+        """
+        del_list = []
+        for device_id, device in self.device_pool.items():
+            if device.has_expired(self.MISSED_HEARTBEATS_ALARM):
+                alert = f"Device <{device_id}> died"
+                await self.inu.alert(alert, await self.get_device_priority(device_id))
+                del_list.append(device_id)
+
+        for device_id in del_list:
+            del self.device_pool[device_id]
 
     async def on_connect(self, server: model.ServerInfo):
         self.logger.info("Connected to NATS server")
@@ -166,11 +193,13 @@ class Sentry(InuHandler):
 
     async def on_alert(self, msg: model.Message):
         """
-        Alert - this needs to go to paging tool (eg Pagerduty).
+        Alert - this needs to go to paging tool (eg Pagerduty) and log engine.
         """
         await self.inu.js.msg.ack(msg)
         device_id = msg.get_subject()[len(const.Subjects.ALERT) + 1:]
         alert = Alert(msg.get_payload())
+
+        # Send to logger
         await self.publish_log(
             const.Streams.ALERTS,
             msg.time_ns,
@@ -185,6 +214,28 @@ class Sentry(InuHandler):
             }
         )
 
+        # Send to alerter
+        if self.sentry_alerter is not None:
+            await self.sentry_alerter.publish(device_id, alert.message, alert.priority)
+
+    async def get_device_priority(self, device_id: str) -> int:
+        """
+        Looks up a device to determine its device priority. Will use a default if settings now found or missing.
+        """
+        try:
+            dvc_settings = await self.inu.js.msg.get_last(
+                const.Streams.SETTINGS,
+                const.Subjects.fqs(const.Subjects.SETTINGS, device_id)
+            )
+
+            p = int(dvc_settings.from_json()['device_priority'])
+            return min(const.Priority.P4, max(const.Priority.P1, p))
+        except mn_error.NotFoundError:
+            return self.DEFAULT_PRIORITY
+        except Exception as e:
+            self.logger.error(f"Error getting device priority - {type(e)}: {e}")
+            return self.DEFAULT_PRIORITY
+
     async def on_hb(self, msg: model.Message):
         """
         Heartbeat from a device. Used to track when a device goes offline.
@@ -198,6 +249,7 @@ class Sentry(InuHandler):
         else:
             dvc = Device(device_id, hb_freq=hb.interval)
             self.device_pool[device_id] = dvc
+            await self.inu.log(f"Device <{device_id}> now online")
 
     async def on_settings(self, msg: model.Message):
         """

@@ -43,7 +43,10 @@ class RangeApp(InuApp):
             self.state = s
             self.state_changed = time.time()
 
-        distance = self.sensor.get_distance()
+        if self.inu.state.can_act(allow_active=True):
+            distance = self.sensor.get_distance()
+        else:
+            distance = self.inu.settings.max_distance + 1
 
         if self.state == self.SensorState.IDLE:
             # Idle, can trigger

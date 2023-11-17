@@ -12,6 +12,11 @@ class Settings(Schema):
     heartbeat_interval_min: int = 1
     heartbeat_interval_max: int = 60
 
+    device_priority: int = 3
+    device_priority_hint: str = "Modifies the priority of device alerts; 1: highest priority, 4: lowest"
+    device_priority_min: int = 1
+    device_priority_max: int = 4
+
 
 class CooldownDevice:
     """

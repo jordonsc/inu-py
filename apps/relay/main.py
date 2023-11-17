@@ -58,7 +58,10 @@ class RelayApp(InuApp):
             self.logger.warning(f"Ignoring trigger with code {code}")
 
     async def on_state_change(self, active: bool):
-        await self.inu.status(enabled=True, active=active, status='ON' if active else 'OFF')
+        if active == self.inu.state.active:
+            return
+
+        await self.inu.activate(active=active, status='ON' if active else 'OFF')
         await self.inu.log(f"Set state: {'ON' if active else 'OFF'}")
 
 

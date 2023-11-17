@@ -40,7 +40,10 @@ class MotionApp(InuApp):
             self.state = s
             self.state_changed = time.time()
 
-        motion = self.sensor.is_motion()
+        if self.inu.state.can_act(allow_active=True):
+            motion = self.sensor.is_motion()
+        else:
+            motion = False
 
         if self.state == self.SensorState.IDLE:
             # Idle, can trigger

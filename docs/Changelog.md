@@ -1,11 +1,14 @@
 ### Build 31
-* 
+* Relay doesn't log state change when it's not actually changing state
+* Added Sentry, supporting Loki & PagerDuty
+* Added `device_priority` to all device settings which influences Sentry alert priority
+* Motion & Range sensors can now be locked/disabled
 
 ### Build 30
 * Relay device now logs status change
 
 ### Build 29
-* Added `Locked` to device status
+* Added `Locked` to device status which will inhibit device action
 
 ### Build 28
 * Added interrupt paths to robotics
@@ -16,7 +19,7 @@
 
 ### Build 27
 * Added Switch application
-* Devices now assume their last state (except Robotics, with more complex logic)
+* Devices now assume their last state (except Robotics, which has more complex logic)
 
 ### Build 26
 * Heartbeat now includes build number & local address
