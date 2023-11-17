@@ -153,7 +153,11 @@ class Sentry(InuHandler):
         await self.publish_log(
             const.Streams.LOGS,
             msg.time_ns,
-            f"[{log.level}] {log.message}",
+            json.dumps({
+                "device_id": device_id,
+                "log_level": log.level,
+                "message": log.message,
+            }),
             {
                 "device_id": device_id,
                 "log_level": log.level,
@@ -170,7 +174,11 @@ class Sentry(InuHandler):
         await self.publish_log(
             const.Streams.ALERTS,
             msg.time_ns,
-            f"[P{alert.priority}] {alert.message}",
+            json.dumps({
+                "device_id": device_id,
+                "priority": f"P{alert.priority}",
+                "message": alert.message,
+            }),
             {
                 "device_id": device_id,
                 "priority": str(alert.priority),
@@ -199,10 +207,12 @@ class Sentry(InuHandler):
         await self.publish_log(
             const.Streams.SETTINGS,
             msg.time_ns,
-            f"{msg.get_payload().decode()}",
-            {
+            json.dumps({
                 "device_id": device_id,
                 "settings": msg.get_payload().decode(),
+            }),
+            {
+                "device_id": device_id,
             }
         )
 
@@ -217,10 +227,14 @@ class Sentry(InuHandler):
         await self.publish_log(
             const.Streams.COMMAND,
             msg.time_ns,
-            f"{cmd} :: {msg.get_payload().decode()}",
+            json.dumps({
+                "device_id": device_id,
+                "command": cmd,
+                "payload": msg.get_payload().decode(),
+            }),
             {
                 "device_id": device_id,
-                "cmd": cmd,
+                "command": cmd,
             }
         )
 
@@ -234,12 +248,17 @@ class Sentry(InuHandler):
         await self.publish_log(
             const.Streams.STATUS,
             msg.time_ns,
-            f"{status}",
+            json.dumps({
+                "device_id": device_id,
+                "enabled": status.enabled,
+                "locked": status.locked,
+                "active": status.active,
+                "status": status.status,
+            }),
             {
                 "device_id": device_id,
-                "enabled": str(status.enabled),
-                "locked": str(status.locked),
-                "active": str(status.active),
-                "status": status.status,
+                "status_enabled": str(status.enabled),
+                "status_locked": str(status.locked),
+                "status_active": str(status.active),
             }
         )
