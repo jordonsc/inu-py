@@ -1,0 +1,10 @@
+{
+    "nats": "nats://localhost:4222",
+    "logger": {
+        "engine": "loki",
+        "target": "http://localhost:3100/loki/api/v1/push"
+    },
+    "pager": {
+        "engine": "pagerduty"
+    }
+}

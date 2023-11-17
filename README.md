@@ -31,16 +31,19 @@ Key commands from the `inu` CLI are:
 
 ### Monitor
 
-    ./inu monitor
+    ./inu monitor [-l] [-a] [-c] [-s] [-b]
 
-Starts a network monitor, displaying logs, alerts and optionly even heartbeats.
+Starts a network monitor, displaying logs, alerts and optionally even heartbeats.
 
 ### Settings
 
     ./inu settings --help
 
 Allows you to view or edit settings for every device on the network. Device settings are stream-based, so clients
-should update settings as you edit them.
+should update settings as you edit them. The settings command also displays device information, heartbeats and allows
+you to send commands directly to the device. 
+
+For robotics devices, you can jog the device actuators (when in `disabled` mode only).
 
 ### Bootstrap
 
@@ -62,17 +65,45 @@ Dev
 ===
 Pre-reqs
 --------
-Python3 with pip requirements -
+_Inu_ requires the following:
+ * Python 3.10+
+ * A NATS server with JetStream support
+ * Grafana & Loki for observability (optional)
+
+Install Python dependencies -
 
     pip install -r requirements.txt
 
-Run a local NATS server -
+Prep config for required services -
 
-    podman run --name nats --rm -p 4222:4222 -p 8222:8222 --volume nats:/usr/share/nats nats --jetstream --store_dir /usr/share/nats
+    mkdir /etc/grafana /etc/loki
+    # copy samples from `docs/confs/`
 
-OSX Certificates (_OSX Only_) -
+Run Docker/Podman containers of required services:
+
+    podman run -d --name nats --network host -v jetstream:/usr/share/nats nats:latest --jetstream --store_dir /usr/share/nats
+    podman run -d --name loki --network host -v loki-data:/loki -v /etc/loki:/mnt/config grafana/loki -config.file=/mnt/config/loki-config.yaml
+    podman run -d --name grafana --network host -v grafana-data:/var/lib/grafana -v /etc/grafana/grafana.ini:/etc/grafana/grafana.ini grafana/grafana-oss
+
+    # There-on-in you can do:
+    podman stop grafana loki nats
+    podman start nats loki grafana
+
+OSX Certificates (_OSX only_) -
 
      /Applications/Python\ 3.10/Install\ Certificates.command
+
+Bootstrap the NATS server (_once only_) -
+
+    ./inu bootstrap 
+
+Running Sentry
+--------------
+_Inu Sentry_ is a service that monitors the streams and forwards logs to a logging and alerting services (currently 
+only _Loki_ and _PagerDuty_ supported). In addition, it monitors heartbeats and raises alerts when a device no longer
+beats.
+
+    ./sentry -c docs/confs/sentry.json
 
 Testing
 =======
