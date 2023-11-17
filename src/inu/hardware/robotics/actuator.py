@@ -173,9 +173,15 @@ class Actuator(RoboticsDevice):
                 # Allow other tasks to run if we have more than MIN_SLEEP_TIME ns remaining
                 await asyncio.sleep(0)
 
-        pwm.deinit()
+        self.off()
         self.displacement = (run_time * speed) / (10 ** 9)
+
+        await asyncio.sleep(0.001)
+        pwm.deinit()
         await asyncio.sleep(self.safe_wait_time / 1000)
+
+        self.on()
+        await asyncio.sleep(0.01)
 
     async def execute(self, ctrl: Control, reverse: bool = False):
         await super().execute(ctrl)

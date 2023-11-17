@@ -32,7 +32,7 @@ class Monitor(Utility, InuHandler):
         self.inu = Inu(Context(
             device_id=["monitor", f"i{random.randint(1000, 9999)}"],
             nats_server=args.nats,
-            has_heartbeat=True,
+            has_heartbeat=False,
             settings_class=Settings,
         ), self)
 

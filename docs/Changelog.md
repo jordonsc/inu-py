@@ -1,3 +1,8 @@
+### Build 32
+* Monitor no longer has a heartbeat
+* Fixed status issue in Relay
+* Added experimental Robotics disabled-safe-wait logic
+
 ### Build 31
 * Relay doesn't log state change when it's not actually changing state
 * Added Sentry, supporting Loki & PagerDuty
