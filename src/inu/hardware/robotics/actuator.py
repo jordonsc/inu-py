@@ -181,7 +181,7 @@ class Actuator(RoboticsDevice):
         await asyncio.sleep(self.safe_wait_time / 1000)
 
         self.on()
-        await asyncio.sleep(0.01)
+        await asyncio.sleep(0.001)
 
     async def execute(self, ctrl: Control, reverse: bool = False):
         await super().execute(ctrl)
