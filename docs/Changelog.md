@@ -1,3 +1,8 @@
+Change Log
+==========
+### Build 33
+* Relay 'state' log level changed to debug
+
 ### Build 32
 * Monitor no longer has a heartbeat
 * Fixed status issue in Relay

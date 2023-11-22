@@ -26,7 +26,7 @@ class Robotics(Settings, ActionDevice, CooldownDevice):
     cal_seq: str = ""
     cal_seq_hint: str = "Calibration sequence when first initialising"
 
-    seq_0: str = "SEL A0; MV 800 300; W 2000; MV -800 150"
+    seq_0: str = ""
     seq_0_hint: str = "Sequence 0 control codes"
 
     seq_1: str = ""

@@ -2,6 +2,7 @@ import asyncio
 import time
 
 from inu.app import InuApp
+from inu.const import LogLevel
 from inu.hardware.relay import Relay
 from inu.schema.settings import Relay as RelaySettings
 from micro_nats.util.asynchronous import TaskPool
@@ -62,7 +63,7 @@ class RelayApp(InuApp):
             return
 
         await self.inu.status(active=active, status='ON' if active else 'OFF')
-        await self.inu.log(f"Set state: {'ON' if active else 'OFF'}")
+        await self.inu.log(f"Set state: {'ON' if active else 'OFF'}", LogLevel.DEBUG)
 
 
 if __name__ == "__main__":
