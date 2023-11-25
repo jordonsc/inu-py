@@ -19,11 +19,19 @@ To put your device into bootloader mode, hold the `BOOT` button and press the `R
 
 Erase any existing bootloader:
 
+    # TinyS2:
     esptool.py --chip esp32s2 --port /dev/ttyACM0 erase_flash
+
+    # TinyS3:
+    esptool.py --chip esp32s3 --port /dev/ttyACM0 erase_flash
 
 And load in the `.bin` file you downloaded above:
 
+    # TinyS2:
     esptool.py --chip esp32s2 --port /dev/ttyACM0 write_flash -z 0x1000 /path/to/firmware.bin
+
+    # TinyS3:
+    esptool.py --chip esp32s3 --port /dev/ttyACM0 write_flash -z 0x0 /path/to/firmware.bin
 
 MicroPython 101
 ---------------
