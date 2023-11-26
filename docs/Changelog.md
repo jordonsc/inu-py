@@ -1,5 +1,10 @@
 Change Log
 ==========
+### Build 34
+* Allow device priority of P5
+* P5 priority does not page (log-only)
+* Improved error handling when subscribing to listen devices
+
 ### Build 33
 * Relay 'state' log level changed to debug
 

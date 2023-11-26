@@ -1,6 +1,6 @@
 from .. import Schema
 from ... import error
-from ...const import DeviceType
+from ...const import DeviceType, Priority
 
 
 class Settings(Schema):
@@ -13,9 +13,9 @@ class Settings(Schema):
     heartbeat_interval_max: int = 60
 
     device_priority: int = 3
-    device_priority_hint: str = "Modifies the priority of device alerts; 1: highest priority, 4: lowest"
-    device_priority_min: int = 1
-    device_priority_max: int = 4
+    device_priority_hint: str = "Modifies the priority of alerts; 1: highest, 4: low, 5: does not page"
+    device_priority_min: int = Priority.HIGHEST
+    device_priority_max: int = Priority.LOWEST
 
 
 class CooldownDevice:

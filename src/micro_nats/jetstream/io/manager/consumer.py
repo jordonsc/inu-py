@@ -1,3 +1,4 @@
+from micro_nats import error
 from micro_nats.jetstream import protocol
 from micro_nats.jetstream.io.manager import SubManager, JetstreamManager
 from micro_nats.jetstream.protocol import consumer
@@ -107,8 +108,11 @@ class ConsumerManager(SubManager):
                 await self.manager.request(api=api, payload=request.to_json(), timeout=self.manager.io_timeout)
             )
 
-            if inbox is not None:
-                self.consumer_map[create_consumer.name] = inbox
+            if not hasattr(create_consumer, "name"):
+                self.logger.error(f"Error creating consumer: {create_consumer}")
+            else:
+                if inbox is not None:
+                    self.consumer_map[create_consumer.name] = inbox
 
             return create_consumer
 

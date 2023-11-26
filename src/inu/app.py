@@ -9,6 +9,7 @@ from inu.schema.command import Ota, Trigger, Reboot
 from inu.updater import OtaUpdater
 from micro_nats import model
 from micro_nats.error import NotFoundError
+from micro_nats.jetstream.error import ErrorResponseException
 from micro_nats.jetstream.protocol import consumer
 from micro_nats.util import Time
 from wifi import Wifi, error as wifi_err
@@ -219,85 +220,96 @@ class InuApp(InuHandler):
 
         IMPORTANT: be sure to call super() as this will subscribe to listen-devices.
         """
-        # Purge any existing listen device consumers
-        for cons_name in self.listen_device_consumers:
-            try:
-                await self.inu.js.consumer.delete(const.Streams.COMMAND, cons_name)
-            except NotFoundError:
-                pass
+        try:
+            # Purge any existing listen device consumers
+            for cons_name in self.listen_device_consumers:
+                try:
+                    await self.inu.js.consumer.delete(const.Streams.COMMAND, cons_name)
+                except NotFoundError:
+                    pass
 
-        # Create a new subject listener (subjects may have changed with settings)
-        async def on_subject_trigger(msg: model.Message):
-            await self.inu.js.msg.ack(msg)
+            # Create a new subject listener (subjects may have changed with settings)
+            async def on_subject_trigger(msg: model.Message):
+                await self.inu.js.msg.ack(msg)
 
-            try:
-                trg = Trigger(msg.get_payload())
-                code = int(trg.code)
-            except Exception as e:
-                await self.inu.log(f"Malformed trigger payload: {type(e).__name__}: {e}", LogLevel.ERROR)
-                return
+                try:
+                    trg = Trigger(msg.get_payload())
+                    code = int(trg.code)
+                except Exception as trg_ex:
+                    await self.inu.log(f"Malformed trigger payload: {type(trg_ex).__name__}: {trg_ex}", LogLevel.ERROR)
+                    return
 
-            self.logger.info(f"Trigger from {msg.subject}: code {code}")
-            await self.parse_trigger_code(code)
+                self.logger.info(f"Trigger from {msg.subject}: code {code}")
+                await self.parse_trigger_code(code)
 
-        # Even if we don't have listen subjects, listen to your own "central" address
-        if not hasattr(self.inu.settings, 'listen_subjects'):
-            subjects = [self.inu.get_central_id()]
-        else:
-            subjects = self.inu.settings.listen_subjects.split(" ")
-            subjects.append(self.inu.get_central_id())
+            # Even if we don't have listen subjects, listen to your own "central" address
+            if not hasattr(self.inu.settings, 'listen_subjects'):
+                subjects = [self.inu.get_central_id()]
+            else:
+                subjects = self.inu.settings.listen_subjects.split(" ")
+                subjects.append(self.inu.get_central_id())
 
-        # Create consumers for all subjects
-        for subject in subjects:
-            if not subject.strip():
-                continue
+            # Create consumers for all subjects
+            for subject in subjects:
+                if not subject.strip():
+                    continue
 
+                try:
+                    cons = await self.inu.js.consumer.create(
+                        consumer.Consumer(
+                            const.Streams.COMMAND,
+                            consumer_cfg=consumer.ConsumerConfig(
+                                filter_subject=const.Subjects.fqs(
+                                    [const.Subjects.COMMAND, const.Subjects.COMMAND_TRIGGER],
+                                    subject
+                                ),
+                                deliver_policy=consumer.ConsumerConfig.DeliverPolicy.NEW,
+                                ack_wait=Time.sec_to_nano(1),
+                            )
+                        ), push_callback=on_subject_trigger,
+                    )
+                    self.listen_device_consumers.append(cons.name)
+                except ErrorResponseException as e:
+                    err = e.err_response
+                    await self.inu.log(
+                        f"Unable to subscribe to device '{subject}': [{err.code}]: {err.description}",
+                        LogLevel.ERROR
+                    )
+
+            # Consumer for OTA updates
             cons = await self.inu.js.consumer.create(
                 consumer.Consumer(
                     const.Streams.COMMAND,
                     consumer_cfg=consumer.ConsumerConfig(
                         filter_subject=const.Subjects.fqs(
-                            [const.Subjects.COMMAND, const.Subjects.COMMAND_TRIGGER],
-                            subject
+                            [const.Subjects.COMMAND, const.Subjects.COMMAND_OTA],
+                            self.inu.get_central_id()
                         ),
                         deliver_policy=consumer.ConsumerConfig.DeliverPolicy.NEW,
                         ack_wait=Time.sec_to_nano(1),
                     )
-                ), push_callback=on_subject_trigger,
+                ), push_callback=self.on_ota,
             )
             self.listen_device_consumers.append(cons.name)
 
-        # Consumer for OTA updates
-        cons = await self.inu.js.consumer.create(
-            consumer.Consumer(
-                const.Streams.COMMAND,
-                consumer_cfg=consumer.ConsumerConfig(
-                    filter_subject=const.Subjects.fqs(
-                        [const.Subjects.COMMAND, const.Subjects.COMMAND_OTA],
-                        self.inu.get_central_id()
-                    ),
-                    deliver_policy=consumer.ConsumerConfig.DeliverPolicy.NEW,
-                    ack_wait=Time.sec_to_nano(1),
-                )
-            ), push_callback=self.on_ota,
-        )
-        self.listen_device_consumers.append(cons.name)
+            # Consumer for reboot requests
+            cons = await self.inu.js.consumer.create(
+                consumer.Consumer(
+                    const.Streams.COMMAND,
+                    consumer_cfg=consumer.ConsumerConfig(
+                        filter_subject=const.Subjects.fqs(
+                            [const.Subjects.COMMAND, const.Subjects.COMMAND_REBOOT],
+                            self.inu.get_central_id()
+                        ),
+                        deliver_policy=consumer.ConsumerConfig.DeliverPolicy.NEW,
+                        ack_wait=Time.sec_to_nano(1),
+                    )
+                ), push_callback=self.on_reboot,
+            )
+            self.listen_device_consumers.append(cons.name)
 
-        # Consumer for reboot requests
-        cons = await self.inu.js.consumer.create(
-            consumer.Consumer(
-                const.Streams.COMMAND,
-                consumer_cfg=consumer.ConsumerConfig(
-                    filter_subject=const.Subjects.fqs(
-                        [const.Subjects.COMMAND, const.Subjects.COMMAND_REBOOT],
-                        self.inu.get_central_id()
-                    ),
-                    deliver_policy=consumer.ConsumerConfig.DeliverPolicy.NEW,
-                    ack_wait=Time.sec_to_nano(1),
-                )
-            ), push_callback=self.on_reboot,
-        )
-        self.listen_device_consumers.append(cons.name)
+        except Exception as e:
+            await self.inu.log(f"Error updating settings: {type(e)}: {e}", LogLevel.FATAL)
 
     async def on_trigger(self, code: int):
         """

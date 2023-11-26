@@ -8,6 +8,7 @@ import time
 
 from inu import Inu, InuHandler, Status
 from inu import const
+from inu.const import Priority
 from inu.schema import Alert, Log, Heartbeat
 from micro_nats import error as mn_error, model
 from micro_nats.jetstream.error import ErrorResponseException
@@ -215,7 +216,7 @@ class Sentry(InuHandler):
         )
 
         # Send to alerter
-        if self.sentry_alerter is not None:
+        if self.sentry_alerter is not None and alert.priority < Priority.LOWEST:
             await self.sentry_alerter.publish(device_id, alert.message, alert.priority)
 
     async def get_device_priority(self, device_id: str) -> int:

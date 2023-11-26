@@ -1,4 +1,4 @@
-INU_BUILD = 33
+INU_BUILD = 34
 
 
 class LogLevel:
@@ -14,6 +14,10 @@ class Priority:
     P2 = 2
     P3 = 3
     P4 = 4
+    P5 = 5
+
+    HIGHEST = 1
+    LOWEST = 5
 
 
 class DeviceType:
