@@ -230,7 +230,7 @@ class Sentry(InuHandler):
             )
 
             p = int(dvc_settings.from_json()['device_priority'])
-            return min(const.Priority.P4, max(const.Priority.P1, p))
+            return min(const.Priority.LOWEST, max(const.Priority.HIGHEST, p))
         except mn_error.NotFoundError:
             return self.DEFAULT_PRIORITY
         except Exception as e:
