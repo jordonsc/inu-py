@@ -199,11 +199,14 @@ class Actuator(RoboticsDevice):
             # An interrupt signal has been received, we need to stop and reverse the action
             if not ignore_int and self.interrupted:
                 # We'll exit cleanly and the caller can deal with the reverse op
+                # NB: we can't interrupt during ramping - we can only cut short the full-speed phase
                 if phase == self.DisplacementPhase.END:
                     break
-                elif phase < self.DisplacementPhase.RAMP_DOWN:
+                elif phase == self.DisplacementPhase.FULL_SPEED:
                     self.logger.info("Interrupted")
                     phase = self.DisplacementPhase.RAMP_DOWN
+                    # Update full-speed time to adjust the ramping calcs
+                    op.full_spd_time = run_time - op.ramp_time
 
             # Check limiters
             if fwd and self.fwd_stop and await self.fwd_stop.check_state():
