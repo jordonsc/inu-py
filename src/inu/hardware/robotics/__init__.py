@@ -1,7 +1,8 @@
 import asyncio
 import logging
 
-from ... import error
+from ... import error, Inu
+from ...const import LogLevel
 
 
 class Control:
@@ -178,7 +179,8 @@ class Robotics:
     Robotics manager service.
     """
 
-    def __init__(self):
+    def __init__(self, inu: Inu):
+        self.inu = inu
         self.devices = {}
         self.logger = logging.getLogger("inu.robotics")
 
@@ -220,8 +222,6 @@ class Robotics:
         """
         self.reset_state()
         await self.run_list(self.control_array_from_string(ctrl_str))
-
-        self.logger.info(f"Sequence complete")
         self.reset_state()
 
     async def run_list(self, control_list: list):
@@ -232,7 +232,7 @@ class Robotics:
         last_sel = None
 
         for ctrl in control_list:
-            self.logger.info(f"EXEC: {ctrl}")
+            await self.inu.log(f"EXEC: {ctrl}", LogLevel.DEBUG)
             await asyncio.sleep(0)
 
             if ctrl.allow_interrupt():
@@ -253,7 +253,7 @@ class Robotics:
             elif isinstance(ctrl, Wait):
                 await asyncio.sleep(ctrl.get_time() / 1000)
             elif ctrl is None:
-                self.logger.warning("Null control code provided")
+                await self.inu.log("Null control code provided", LogLevel.WARNING)
             else:
                 # Tangible codes need to be sent to the active RoboticsDevice
                 if self.active_device is None:
@@ -264,14 +264,14 @@ class Robotics:
             if self.interrupted:
                 # Run the int_chain in reverse order..
                 self.reset_state()
-                self.logger.info("Reversing ops..")
+                await self.inu.log("Reversing ops..", LogLevel.DEBUG)
                 await self.run_int_list(int_chain)
 
                 # then run it again in normal order
                 self.reset_state()
-                self.logger.info("Replaying interrupted ops..")
+                await self.inu.log("Replaying interrupted ops..", LogLevel.DEBUG)
                 await self.run_list(int_chain)
-                self.logger.info("INT seq completed")
+                await self.inu.log("INT seq completed", LogLevel.DEBUG)
 
     def reset_state(self):
         """
@@ -286,7 +286,7 @@ class Robotics:
         Runs a list of operations in reverse order and direction.
         """
         for ctrl in self.prepare_int_list(control_list):
-            self.logger.info(f"REV EXEC: {ctrl}")
+            await self.inu.log(f"REV EXEC: {ctrl}", LogLevel.DEBUG)
             await asyncio.sleep(0)
 
             # Non-tangible codes -
@@ -323,7 +323,7 @@ class Robotics:
                 buffer.append(ctrl)
 
         if len(buffer) > 0:
-            self.logger.warning("INT list has no preceding SEL")
+            await self.inu.log("INT list has no preceding SEL", LogLevel.WARNING)
             int_list += buffer
 
         return int_list

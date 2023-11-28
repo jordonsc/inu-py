@@ -1,5 +1,9 @@
 Change Log
 ==========
+### Build 35
+* Removing the disabled-wait logic in Robotics
+* Actuator has a ramp-up time instead of trying to move at full-speed instantly
+
 ### Build 34
 * Allow device priority of P5
 * P5 priority does not page (log-only)

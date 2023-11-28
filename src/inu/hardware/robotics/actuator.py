@@ -31,14 +31,44 @@ class Screw:
         return f"steps/rev: {self.steps_per_rev}; lead: {self.screw_lead}"
 
 
+class OpVector:
+    def __init__(self, min_speed, speed, distance, ramp_accel):
+        self.min_speed = min_speed
+        self.speed = speed
+        self.total_displacement = distance
+        self.ramp_accel = max(self.get_min_ramp_accel(), ramp_accel)
+
+        # Time spent ramping up/down
+        self.ramp_time = speed / self.ramp_accel
+        # Displacement during a single ramp phase
+        self.ramp_displacement = ((speed - min_speed) + min_speed) / 2 * self.ramp_time
+        # Displacement during the full-speed phase
+        self.full_displacement = distance - (self.ramp_displacement * 2)
+
+        self.ramp_time = self.ramp_time * 10 ** 9  # convert to NS
+        self.full_spd_time = self.full_displacement / speed * 10 ** 9
+        self.op_time = self.full_spd_time + (self.ramp_time * 2)
+
+    def get_min_ramp_accel(self):
+        """
+        Returns the minimum acceleration we need to ramp at in order to hit full-speed during the operation.
+        """
+        return (2 * self.speed ** 2) / self.total_displacement
+
+    def __repr__(self):
+        return f"<op ramp_in={round(self.ramp_time * 10 ** -9, 2)} " + \
+               f"full_spd={round(self.full_spd_time * 10 ** -9, 2)} " + \
+               f"ramp_out={round(self.ramp_time * 10 ** -9, 2)} " + \
+               f"op_time={round(self.op_time * 10 ** -9, 2)}>"
+
+
 class Actuator(RoboticsDevice):
     """
     Moves an actuator forward or backwards.
 
     Supports undoing partial operations on interrupt.
     """
-
-    CONFIG_CODE = "stepper"
+    CONFIG_ALIASES = ["actuator", "stepper"]
 
     # Required time remaining in an operation (in nanoseconds) to allow yielding CPU
     MIN_SLEEP_TIME = 0.25 * 10 ** 9  # 0.25 seconds
@@ -46,9 +76,17 @@ class Actuator(RoboticsDevice):
     # Time to pause when interrupted before reversing
     INT_PAUSE_TIME = 0.5
 
-    def __init__(self, driver: StepperDriver, screw: Screw, safe_wait: int = 250, fwd_stop: Switch = None,
-                 rev_stop: Switch = None, allow_sleep: bool = True):
+    class DisplacementPhase:
+        RAMP_UP = 0
+        FULL_SPEED = 1
+        RAMP_DOWN = 2
+        END = 3
+
+    def __init__(self, driver: StepperDriver, screw: Screw, safe_wait: int = 50, ramp_speed: int = 250,
+                 fwd_stop: Switch = None, rev_stop: Switch = None, allow_sleep: bool = True):
         """
+        `safe_wait` is a delay in ms to hold after stopping the stepper.
+        `ramp_speed` is the acceleration rate in mm/s to start/stop the stepper.
         `allow_sleep` will allow the device to yield CPU if there is more than MIN_SLEEP_TIME nanoseconds remaining in
         the operation.
         """
@@ -71,6 +109,7 @@ class Actuator(RoboticsDevice):
         self.rev_stop = rev_stop
 
         self.allow_sleep = allow_sleep
+        self.ramp_accel = ramp_speed
 
         # Displacement of last operation
         self.displacement = 0
@@ -132,11 +171,6 @@ class Actuator(RoboticsDevice):
         if self.driver.direction.value() != direction:
             self.driver.direction.value(direction)
 
-        pps = self.pulse_rate_from_speed(speed)
-        op_time = distance / speed * 10 ** 9
-        self.displacement = 0
-        self.logger.info(f"Op time: {round(op_time * 10 ** -9, 2)}; safe-wait: {self.safe_wait_time / 1000}")
-
         # Don't even start the stepper if the limiter is already triggered
         if fwd and self.fwd_stop and await self.fwd_stop.check_state():
             return
@@ -144,16 +178,22 @@ class Actuator(RoboticsDevice):
         if not fwd and self.rev_stop and await self.rev_stop.check_state():
             return
 
-        start_time = time.time_ns()
-        pwm = PWM(self.driver.pulse, freq=pps, duty=512)
+        # Calculate ramp times
+        op = OpVector(min_speed=10, speed=speed, distance=distance, ramp_accel=self.ramp_accel)
+        self.logger.info(op)
 
-        # Do NOT use sleep when we're close to reaching `op_time` - this must be as dead accurate as possible
+        self.displacement = 0
+        phase = self.DisplacementPhase.RAMP_UP
+        run_time = 0
+        current_speed = op.min_speed
+
+        last_tick = time.time_ns()
+        start_time = last_tick
+
+        pwm = PWM(self.driver.pulse, freq=self.pulse_rate_from_speed(current_speed), duty=512)
+
         while True:
-            run_time = time.time_ns() - start_time
-            rem_time = op_time - run_time
-
-            # Operation completed
-            if run_time >= op_time:
+            if self.displacement >= distance:
                 break
 
             # An interrupt signal has been received, we need to stop and reverse the action
@@ -162,26 +202,50 @@ class Actuator(RoboticsDevice):
                 self.logger.info("Interrupted")
                 break
 
-            # If we have sufficient time, we'll check the GPIO pins for the end-stops
+            # Check limiters
             if fwd and self.fwd_stop and await self.fwd_stop.check_state():
                 break
             if not fwd and self.rev_stop and await self.rev_stop.check_state():
                 break
 
-            # We'll only allow a sleep if we have a safe amount of time remaining before cut-off
-            if self.allow_sleep and rem_time > self.MIN_SLEEP_TIME:
-                # Allow other tasks to run if we have more than MIN_SLEEP_TIME ns remaining
+            tick = time.time_ns()
+            tick_time = tick - last_tick
+            if tick_time == 0:
+                continue
+            else:
+                last_tick = tick
+
+            self.displacement += current_speed * tick_time * 10 ** -9
+            run_time = tick - start_time
+
+            # Update PWM speed/phase
+            if phase == self.DisplacementPhase.RAMP_UP:
+                pos = run_time / op.ramp_time
+                current_speed = min(((op.speed - op.min_speed) * pos) + op.min_speed, op.speed)
+                pwm.freq(self.pulse_rate_from_speed(current_speed))
+                if current_speed >= op.speed:
+                    self.logger.info(f"Move to full-speed phase at {run_time * 10 ** -9} s; pos {pos}")
+                    phase = self.DisplacementPhase.FULL_SPEED
+            elif phase == self.DisplacementPhase.FULL_SPEED:
+                if run_time >= op.ramp_time + op.full_spd_time:
+                    self.logger.info(f"Move to ramp-down phase at {run_time * 10 ** -9} s")
+                    phase = self.DisplacementPhase.RAMP_DOWN
+            elif phase == self.DisplacementPhase.RAMP_DOWN:
+                pos = 1 - ((run_time - op.full_spd_time - op.ramp_time) / op.ramp_time)
+                current_speed = max(((op.speed - op.min_speed) * pos) + op.min_speed, op.min_speed)
+                pwm.freq(self.pulse_rate_from_speed(current_speed))
+                if current_speed <= op.min_speed:
+                    self.logger.info(f"Move to end phase at {run_time * 10 ** -9} s; pos {pos}")
+                    phase = self.DisplacementPhase.END
+
+            # Ramp-down/end is time-sensitive, do not allow sleeping (passing CPU to other tasks)
+            if phase < self.DisplacementPhase.RAMP_DOWN:
                 await asyncio.sleep(0)
 
-        self.off()
-        self.displacement = (run_time * speed) / (10 ** 9)
-
-        await asyncio.sleep(0.001)
         pwm.deinit()
         await asyncio.sleep(self.safe_wait_time / 1000)
 
-        self.on()
-        await asyncio.sleep(0.001)
+        self.logger.info(f"Done in {run_time * 10 ** -9} s; displacement: {self.displacement}")
 
     async def execute(self, ctrl: Control, reverse: bool = False):
         await super().execute(ctrl)

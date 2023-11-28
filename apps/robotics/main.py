@@ -18,7 +18,7 @@ class RoboticsApp(InuApp):
     def __init__(self):
         super().__init__(RoboSettings)
         self.pool = TaskPool()
-        self.robotics = Robotics()
+        self.robotics = Robotics(self.inu)
         self.jog_consumer = None
 
     def load_devices(self):
@@ -38,7 +38,7 @@ class RoboticsApp(InuApp):
 
         for device_id, spec in devices.items():
             device_type = device_cfg(spec, ["type"])
-            if device_type == actuator.Actuator.CONFIG_CODE:
+            if device_type in actuator.Actuator.CONFIG_ALIASES:
                 # limit switches
                 fwd_sw = None
                 rev_sw = None
@@ -66,7 +66,8 @@ class RoboticsApp(InuApp):
                         screw_lead=device_cfg(spec, ["screw", "screw_lead"], 5),
                         forward=device_cfg(spec, ["screw", "forward"], 1),
                     ),
-                    device_cfg(spec, ["safe_wait"], 250),
+                    device_cfg(spec, ["safe_wait"], 50),
+                    device_cfg(spec, ["ramp_speed"], 250),
                     fwd_sw,
                     rev_sw,
                 ))
@@ -133,7 +134,7 @@ class RoboticsApp(InuApp):
             ctrl = getattr(self.inu.settings, seq).strip()
 
             if len(ctrl) == 0:
-                await self.inu.log(f"Ignoring sequence {code} with no control codes")
+                await self.inu.log(f"Ignoring sequence {code} with no control codes", LogLevel.WARNING)
                 return
 
             await self.inu.log(f"Execute sequence {code} // {ctrl}")
