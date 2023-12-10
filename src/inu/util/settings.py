@@ -138,8 +138,8 @@ class Settings(InuHandler, App):
     # IDs excluded from "making a change"
     EXCLUDED_IDS = ["trg_code", "stat_enabled", "stat_locked", "stat_active"]
 
-    JOG_DIST_STEPS = [1, 5, 10, 25, 100]
-    JOG_SPEED_STEPS = [2, 5, 10, 20, 50]
+    JOG_DIST_STEPS = [1, 5, 10, 25, 100, 250]
+    JOG_SPEED_STEPS = [2, 5, 10, 20, 50, 100]
 
     def __init__(self, args: argparse.Namespace):
         super().__init__()

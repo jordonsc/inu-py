@@ -32,6 +32,10 @@ class RangeTrigger(TriggerDevice):
     max_distance_hint: str = "If the range drops below this value (in mm), the sensor will trigger"
     max_distance_min: int = 30
 
+    min_distance: int = 0
+    min_distance_hint: str = "Range must be above this value (and below max) for a trigger"
+    min_distance_min: int = 0
+
     wait_delay: int = 0
     wait_delay_hint: str = "Time in ms the range must be under the max_distance value before triggering"
     wait_delay_min: int = 0

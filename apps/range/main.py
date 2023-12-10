@@ -50,7 +50,7 @@ class RangeApp(InuApp):
 
         if self.state == self.SensorState.IDLE:
             # Idle, can trigger
-            if distance and distance <= self.inu.settings.max_distance:
+            if distance and self.inu.settings.max_distance >= distance >= self.inu.settings.min_distance:
                 if self.inu.settings.wait_delay == 0:
                     # No wait delay, fire immediately
                     await self.inu.activate(f"{const.Strings.RANGE} {self.sensor.get_distance()}")

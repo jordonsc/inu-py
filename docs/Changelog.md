@@ -1,5 +1,8 @@
 Change Log
 ==========
+### Build 36
+* Range devices now have min-range
+
 ### Build 35
 * Removing the disabled-wait logic in Robotics
 * Actuator has a ramp-up time instead of trying to move at full-speed instantly
