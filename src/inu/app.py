@@ -193,11 +193,11 @@ class InuApp(InuHandler):
             await self.on_enabled_changed(self.inu.state.enabled)
         elif code == const.TriggerCode.ENABLE_ON:
             if not self.inu.state.enabled:
-                await self.inu.activate()
+                await self.inu.status(enabled=True, status="")
                 await self.on_enabled_changed(True)
         elif code == const.TriggerCode.ENABLE_OFF:
             if self.inu.state.enabled:
-                await self.inu.deactivate()
+                await self.inu.status(enabled=False, status="")
                 await self.on_enabled_changed(False)
         elif code == const.TriggerCode.LOCK_TOGGLE:
             await self.inu.status(locked=not self.inu.state.locked)

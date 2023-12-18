@@ -13,6 +13,8 @@ from inu.util.build import Build
 
 from textual.app import App as TuiApp
 
+from inu.util.toggle import ModeToggle
+
 parser = argparse.ArgumentParser(description='Inu Framework Command Line Tool')
 
 parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
@@ -68,6 +70,16 @@ build_parser.add_argument('-o', '--ota', dest="ota", action='store_true',
 build_parser.add_argument('-s', '--settings', dest="settings", action='store_true',
                           help="only apply new settings to the device")
 
+# Lock/Unlock/Enable/Disable
+lock_parser = subparsers.add_parser('lock', help='lock a device')
+lock_parser.add_argument(dest="device_id", nargs=1, help="Device unique ID, eg 'sensor.my_sensor'")
+unlock_parser = subparsers.add_parser('unlock', help='unlock a device')
+unlock_parser.add_argument(dest="device_id", nargs=1, help="Device unique ID, eg 'sensor.my_sensor'")
+enable_parser = subparsers.add_parser('enable', help='enable a device')
+enable_parser.add_argument(dest="device_id", nargs=1, help="Device unique ID, eg 'sensor.my_sensor'")
+disable_parser = subparsers.add_parser('disable', help='disable a device')
+disable_parser.add_argument(dest="device_id", nargs=1, help="Device unique ID, eg 'sensor.my_sensor'")
+
 
 def safe_exit():
     for task in asyncio.all_tasks():
@@ -82,7 +94,10 @@ if __name__ == '__main__':
     elif args.quiet:
         logging.basicConfig(level=logging.WARNING)
     else:
-        logging.basicConfig(level=logging.INFO)
+        if args.cmd in ["lock", "unlock", "enable", "disable"]:
+            logging.basicConfig(level=logging.WARNING)
+        else:
+            logging.basicConfig(level=logging.INFO)
 
     app = None
     if args.cmd == "monitor":
@@ -93,6 +108,14 @@ if __name__ == '__main__':
         app = Settings(args)
     elif args.cmd == "build":
         app = Build(args)
+    elif args.cmd == "lock":
+        app = ModeToggle(args, ModeToggle.Mode.LOCK)
+    elif args.cmd == "unlock":
+        app = ModeToggle(args, ModeToggle.Mode.UNLOCK)
+    elif args.cmd == "enable":
+        app = ModeToggle(args, ModeToggle.Mode.ENABLE)
+    elif args.cmd == "disable":
+        app = ModeToggle(args, ModeToggle.Mode.DISABLE)
     else:
         parser.print_usage()
         exit(1)

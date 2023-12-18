@@ -1,5 +1,8 @@
 Change Log
 ==========
+### Build 37
+* Fixed bug with devices ignoring enable/disable trigger codes
+
 ### Build 36
 * Range devices now have min-range
 
