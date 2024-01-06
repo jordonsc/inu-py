@@ -82,7 +82,7 @@ class Actuator(RoboticsDevice):
         RAMP_DOWN = 2
         END = 3
 
-    def __init__(self, driver: StepperDriver, screw: Screw, safe_wait: int = 50, ramp_speed: int = 250,
+    def __init__(self, driver: StepperDriver, screw: Screw, safe_wait: int = 10, ramp_speed: int = 250,
                  fwd_stop: Switch = None, rev_stop: Switch = None, allow_sleep: bool = True):
         """
         `safe_wait` is a delay in ms to hold after stopping the stepper.
@@ -100,9 +100,7 @@ class Actuator(RoboticsDevice):
         self.driver.direction.off()
         self.driver.enabled.off()
 
-        # It is important to delay a small amount in order to allow a clean finish to the PWM signal after stopping the
-        # stepper. If you don't do this, and start another PWM signal immediately, it might cause the driver to
-        # overload. The higher the steps/rev, the lower this value can be.
+        # Delay between commands
         self.safe_wait_time = safe_wait
 
         self.fwd_stop = fwd_stop
