@@ -94,7 +94,7 @@ if __name__ == '__main__':
     elif args.quiet:
         logging.basicConfig(level=logging.WARNING)
     else:
-        if args.cmd in ["lock", "unlock", "enable", "disable"]:
+        if args.cmd in ["settings", "lock", "unlock", "enable", "disable"]:
             logging.basicConfig(level=logging.WARNING)
         else:
             logging.basicConfig(level=logging.INFO)
