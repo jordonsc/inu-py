@@ -1,19 +1,24 @@
 import asyncio
 import logging
-
-from . import Control
-from ..robotics import RoboticsDevice, Move
-from machine import Pin, PWM
 import time
 
+from machine import Pin, PWM
+from . import Control
+from ..robotics import RoboticsDevice, Move
 from ..switch import Switch
+from ... import error
 
 
 class StepperDriver:
-    def __init__(self, pulse, direction, enabled):
+    def __init__(self, pulse, direction, enabled, alert=None):
         self.pulse = Pin(pulse, Pin.OUT)
         self.direction = Pin(direction, Pin.OUT)
         self.enabled = Pin(enabled, Pin.OUT)
+
+        if alert is not None:
+            self.alert = Switch(alert)
+        else:
+            self.alert = None
 
 
 class Screw:
@@ -205,6 +210,10 @@ class Actuator(RoboticsDevice):
                     phase = self.DisplacementPhase.RAMP_DOWN
                     # Update full-speed time to adjust the ramping calcs
                     op.full_spd_time = run_time - op.ramp_time
+
+            # Check for an alert from the controller
+            if self.driver.alert and self.driver.alert.check_state():
+                raise error.DeviceAlert()
 
             # Check limiters
             if fwd and self.fwd_stop and await self.fwd_stop.check_state():

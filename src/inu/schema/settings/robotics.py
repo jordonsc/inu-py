@@ -26,6 +26,9 @@ class Robotics(Settings, ActionDevice, CooldownDevice):
     cal_seq: str = ""
     cal_seq_hint: str = "Calibration sequence when first initialising"
 
+    idle_power: bool = False
+    idle_power_hint: str = "Keep devices powered when robotics is idle"
+
     seq_0: str = ""
     seq_0_hint: str = "Sequence 0 control codes"
 

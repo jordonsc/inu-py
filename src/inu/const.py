@@ -1,4 +1,4 @@
-INU_BUILD = 37
+INU_BUILD = 38
 
 
 class LogLevel:
@@ -146,6 +146,7 @@ class Streams:
 
 class TriggerCode:
     INTERRUPT = 100
+    CALIBRATE = 101
 
     ENABLE_TOGGLE = 110
     ENABLE_ON = 111

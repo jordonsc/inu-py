@@ -1,5 +1,11 @@
 Change Log
 ==========
+### Build 38
+* Added `alert` to Robotics stepper controllers
+* Added `idle power` settings to Robotics
+* Removed the direct correlation between a Robotics device and its physical device's enabled states
+* Changed Robotics default pin configuration to match a Tiny S3 pinout
+
 ### Build 37
 * Fixed bug with devices ignoring enable/disable trigger codes
 

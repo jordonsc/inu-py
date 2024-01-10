@@ -148,7 +148,9 @@ class Settings(InuHandler, App):
         self.inu = Inu(const.Context(
             device_id=["settings", f"i{random.randint(1000, 9999)}"],
             nats_server=args.nats,
+
         ), self)
+        self.inu.nats.manager.context.auto_reconnect = False
         self.config = None
         self.config_hint = None
         self.title = "Connecting to NATS.."

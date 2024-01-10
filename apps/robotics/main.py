@@ -47,26 +47,27 @@ class RoboticsApp(InuApp):
                 if es:
                     if "forward" in es:
                         fwd_sw = Switch(
-                            pin=device_cfg(es, ["forward", "pin"], 36),
+                            pin=device_cfg(es, ["forward", "pin"], 34),
                             mode=device_cfg(es, ["forward", "mode"], SwitchMode.NO),
                         )
                         rev_sw = Switch(
-                            pin=device_cfg(es, ["reverse", "pin"], 14),
+                            pin=device_cfg(es, ["reverse", "pin"], 36),
                             mode=device_cfg(es, ["reverse", "mode"], SwitchMode.NO),
                         )
 
                 self.robotics.add_device(device_id, actuator.Actuator(
                     actuator.StepperDriver(
-                        pulse=device_cfg(spec, ["driver", "pulse_pin"], 33),
-                        direction=device_cfg(spec, ["driver", "direction_pin"], 38),
+                        pulse=device_cfg(spec, ["driver", "pulse_pin"], 6),
+                        direction=device_cfg(spec, ["driver", "direction_pin"], 7),
                         enabled=device_cfg(spec, ["driver", "enabled_pin"], 8),
+                        alert=device_cfg(spec, ["driver", "enabled_pin"], None),
                     ),
                     actuator.Screw(
                         steps_per_rev=device_cfg(spec, ["screw", "steps_per_rev"], 1600),
                         screw_lead=device_cfg(spec, ["screw", "screw_lead"], 5),
                         forward=device_cfg(spec, ["screw", "forward"], 1),
                     ),
-                    device_cfg(spec, ["safe_wait"], 50),
+                    device_cfg(spec, ["safe_wait"], 10),
                     device_cfg(spec, ["ramp_speed"], 250),
                     fwd_sw,
                     rev_sw,
@@ -124,6 +125,18 @@ class RoboticsApp(InuApp):
         pass
 
     async def on_trigger(self, code: int):
+        # Check for a calibration request (code 101)
+        if code == const.TriggerCode.CALIBRATE:
+            if self.inu.state.enabled:
+                self.inu.log("Cannot calibrate while enabled", LogLevel.WARNING)
+            else:
+                cal_seq = self.inu.settings.cal_seq.strip()
+                if cal_seq and cal_seq[0] != "#":
+                    await self.run_calibration(cal_seq)
+                else:
+                    self.inu.log("Not calibration sequence configured", LogLevel.WARNING)
+            return
+
         if not self.inu.state.can_act():
             self.logger.info(f"Ignoring trigger: {self.inu.state}")
             return
@@ -156,6 +169,19 @@ class RoboticsApp(InuApp):
             except Exception as e:
                 await self.inu.log(f"Exception in robotics execution - {type(e).__name__}: {e}", LogLevel.ERROR)
 
+            except error.DeviceAlert:
+                await self.inu.alert(
+                    f"Robotics malfunction during {const.Strings.SEQ} {code}",
+                    priority=self.inu.settings.device_priority
+                )
+                await self.inu.log(f"Device controller alert; aborting sequence", LogLevel.ERROR)
+                self.robotics.set_power(False)
+                self.inu.status(active=False, enabled=False, status="Robotics malfunction!")
+
+            finally:
+                if not self.inu.settings.idle_power:
+                    self.robotics.set_power(False)
+
     async def on_interrupt(self):
         """
         A listen-device has published an interrupt code.
@@ -170,7 +196,8 @@ class RoboticsApp(InuApp):
         """
         Enabled-state changed externally.
         """
-        self.robotics.set_power(enabled)
+        # In versions <= 37, we also changed device power state. This is no longer coupled.
+        pass
 
     async def on_settings_updated(self):
         await super().on_settings_updated()
@@ -256,7 +283,9 @@ class RoboticsApp(InuApp):
 
             await self.inu.log("Calibration success")
             await self.inu.status(enabled=True, active=False, status="")
-            self.robotics.set_power(True)
+
+            if not self.inu.settings.idle_power:
+                self.robotics.set_power(False)
 
         except Exception as e:
             await self.inu.log(f"Exception in robotics calibration - {type(e).__name__}: {e}", LogLevel.ERROR)

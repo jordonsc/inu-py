@@ -20,3 +20,7 @@ class InvalidDeviceId(InuError):
 
 class UnsupportedDeviceType(InuError):
     pass
+
+
+class DeviceAlert(InuError):
+    pass

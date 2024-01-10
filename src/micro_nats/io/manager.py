@@ -100,7 +100,7 @@ class IoManager(protocol.MessageHandler):
 
             except asyncio.TimeoutError:
                 if self.context.auto_reconnect:
-                    self.logger.error("Connection refused")
+                    self.logger.error("Connection timeout")
                 else:
                     raise error.NetworkTimeout()
 
