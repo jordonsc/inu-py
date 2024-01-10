@@ -64,6 +64,7 @@ class OpVector:
         return f"<op ramp_in={round(self.ramp_time * 10 ** -9, 2)} " + \
                f"full_spd={round(self.full_spd_time * 10 ** -9, 2)} " + \
                f"ramp_out={round(self.ramp_time * 10 ** -9, 2)} " + \
+               f"accel={self.ramp_accel} " + \
                f"op_time={round(self.op_time * 10 ** -9, 2)}>"
 
 
@@ -87,10 +88,9 @@ class Actuator(RoboticsDevice):
         RAMP_DOWN = 2
         END = 3
 
-    def __init__(self, driver: StepperDriver, screw: Screw, safe_wait: int = 10, ramp_speed: int = 250,
+    def __init__(self, driver: StepperDriver, screw: Screw, ramp_speed: int = 250,
                  fwd_stop: Switch = None, rev_stop: Switch = None, allow_sleep: bool = True):
         """
-        `safe_wait` is a delay in ms to hold after stopping the stepper.
         `ramp_speed` is the acceleration rate in mm/s to start/stop the stepper.
         `allow_sleep` will allow the device to yield CPU if there is more than MIN_SLEEP_TIME nanoseconds remaining in
         the operation.
@@ -104,9 +104,6 @@ class Actuator(RoboticsDevice):
         self.driver.pulse.off()
         self.driver.direction.off()
         self.driver.enabled.off()
-
-        # Delay between commands
-        self.safe_wait_time = safe_wait
 
         self.fwd_stop = fwd_stop
         self.rev_stop = rev_stop
@@ -170,6 +167,7 @@ class Actuator(RoboticsDevice):
 
         if self.driver.enabled.value() == 0:
             self.set_power(True)
+            await asyncio.sleep(0.25)
 
         if self.driver.direction.value() != direction:
             self.driver.direction.value(direction)
@@ -182,8 +180,11 @@ class Actuator(RoboticsDevice):
             return
 
         # Calculate ramp times
-        op = OpVector(min_speed=10, speed=speed, distance=distance, ramp_accel=self.ramp_accel)
+        op = OpVector(min_speed=1, speed=speed, distance=distance, ramp_accel=self.ramp_accel)
         self.logger.info(op)
+        if op.ramp_accel > self.ramp_accel:
+            self.logger.warning(f"Required operation acceleration ({op.ramp_accel} is greater than configured " +
+                                f"acceleration ({self.ramp_accel}")
 
         self.displacement = 0
         phase = self.DisplacementPhase.RAMP_UP
@@ -212,13 +213,18 @@ class Actuator(RoboticsDevice):
                     op.full_spd_time = run_time - op.ramp_time
 
             # Check for an alert from the controller
-            if self.driver.alert and self.driver.alert.check_state():
+            if self.driver.alert is not None and await self.driver.alert.check_state():
+                # This should be wrapped in a handler that will dispatch an appropriate alert and shutdown all
+                # robotics functions (depending on context)
+                pwm.deinit()
                 raise error.DeviceAlert()
 
             # Check limiters
             if fwd and self.fwd_stop and await self.fwd_stop.check_state():
+                self.logger.info("Forward limiter halt")
                 break
             if not fwd and self.rev_stop and await self.rev_stop.check_state():
+                self.logger.info("Reverse limiter halt")
                 break
 
             tick = time.time_ns()
@@ -260,8 +266,6 @@ class Actuator(RoboticsDevice):
                 await asyncio.sleep(0)
 
         pwm.deinit()
-        await asyncio.sleep(self.safe_wait_time / 1000)
-
         self.logger.info(f"Done in {run_time * 10 ** -9} s; displacement: {self.displacement}")
 
     async def execute(self, ctrl: Control, reverse: bool = False):

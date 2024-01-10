@@ -20,11 +20,13 @@ class RoboticsApp(InuApp):
         self.pool = TaskPool()
         self.robotics = Robotics(self.inu)
         self.jog_consumer = None
+        self.power_delay = 0.25
 
     def load_devices(self):
         """
         Read device configuration and bootstrap the robotics controller with device information.
         """
+        self.power_delay = self.get_config(["robotics", "power_delay"], 250) / 1000
         devices = self.get_config(["robotics", "devices"])
         if not isinstance(devices, dict):
             raise error.Malformed(f"Malformed device configuration for robotics")
@@ -60,14 +62,13 @@ class RoboticsApp(InuApp):
                         pulse=device_cfg(spec, ["driver", "pulse_pin"], 6),
                         direction=device_cfg(spec, ["driver", "direction_pin"], 7),
                         enabled=device_cfg(spec, ["driver", "enabled_pin"], 8),
-                        alert=device_cfg(spec, ["driver", "enabled_pin"], None),
+                        alert=device_cfg(spec, ["driver", "alert_pin"], None),
                     ),
                     actuator.Screw(
                         steps_per_rev=device_cfg(spec, ["screw", "steps_per_rev"], 1600),
                         screw_lead=device_cfg(spec, ["screw", "screw_lead"], 5),
                         forward=device_cfg(spec, ["screw", "forward"], 1),
                     ),
-                    device_cfg(spec, ["safe_wait"], 10),
                     device_cfg(spec, ["ramp_speed"], 250),
                     fwd_sw,
                     rev_sw,
@@ -98,7 +99,8 @@ class RoboticsApp(InuApp):
             if stat.enabled and not stat.active:
                 await self.inu.log("Previous state is idle; starting enabled")
                 await self.inu.status(enabled=True, active=False, status="")
-                self.robotics.set_power(True)
+                if self.inu.settings.idle_power:
+                    self.robotics.set_power(True)
             else:
                 if cal_seq:
                     # Auto calibration
@@ -151,6 +153,11 @@ class RoboticsApp(InuApp):
                 return
 
             await self.inu.log(f"Execute sequence {code} // {ctrl}")
+
+            if not self.inu.settings.idle_power:
+                self.robotics.set_power(True)
+                await asyncio.sleep(self.power_delay)
+
             try:
                 await self.inu.activate(f"{const.Strings.SEQ} {code}")
                 # robotics.run() may monopolise CPU, so sleep enough time to dispatch the status update
@@ -166,17 +173,18 @@ class RoboticsApp(InuApp):
                 await self.inu.deactivate()
                 await self.inu.log(f"Sequence complete")
 
-            except Exception as e:
-                await self.inu.log(f"Exception in robotics execution - {type(e).__name__}: {e}", LogLevel.ERROR)
-
             except error.DeviceAlert:
+                self.logger.warning("Dispatching alert and deactivating")
                 await self.inu.alert(
                     f"Robotics malfunction during {const.Strings.SEQ} {code}",
                     priority=self.inu.settings.device_priority
                 )
                 await self.inu.log(f"Device controller alert; aborting sequence", LogLevel.ERROR)
                 self.robotics.set_power(False)
-                self.inu.status(active=False, enabled=False, status="Robotics malfunction!")
+                await self.inu.status(active=False, enabled=False, status="Robotics malfunction!")
+
+            except Exception as e:
+                await self.inu.log(f"Exception in robotics execution - {type(e).__name__}: {e}", LogLevel.ERROR)
 
             finally:
                 if not self.inu.settings.idle_power:
@@ -239,6 +247,10 @@ class RoboticsApp(InuApp):
             await self.inu.js.msg.term(msg)
             return
 
+        if not self.inu.settings.idle_power:
+            self.robotics.set_power(True)
+            await asyncio.sleep(self.power_delay)
+
         acked = False
         try:
             jog = Jog(msg.get_payload())
@@ -264,6 +276,14 @@ class RoboticsApp(InuApp):
             await self.robotics.run(f"SEL {jog.device_id}; MV {jog.distance} {jog.speed}")
             await self.inu.deactivate()
 
+            if not self.inu.settings.idle_power:
+                self.robotics.set_power(False)
+
+        except error.DeviceAlert:
+            await self.inu.alert("Robotics malfunction during jog", priority=self.inu.settings.device_priority)
+            self.robotics.set_power(False)
+            await self.inu.status(active=False, enabled=False, status="Jog malfunction")
+
         except Exception as e:
             self.inu.log(f"Error jogging - {type(e).__name__}: {e}", LogLevel.ERROR)
             if not acked:
@@ -274,6 +294,11 @@ class RoboticsApp(InuApp):
         Runs provided calibration sequence and configures device status according to calibration success.
         """
         await self.inu.log("Calibrating..")
+
+        if not self.inu.settings.idle_power:
+            self.robotics.set_power(True)
+            await asyncio.sleep(self.power_delay)
+
         try:
             await self.inu.activate(f"Calibrating")
             await asyncio.sleep(0.1)
@@ -286,6 +311,14 @@ class RoboticsApp(InuApp):
 
             if not self.inu.settings.idle_power:
                 self.robotics.set_power(False)
+
+        except error.DeviceAlert:
+            await self.inu.alert(
+                "Robotics malfunction during calibration sequence",
+                priority=self.inu.settings.device_priority
+            )
+            self.robotics.set_power(False)
+            await self.inu.status(active=False, enabled=False, status="Calibration malfunction")
 
         except Exception as e:
             await self.inu.log(f"Exception in robotics calibration - {type(e).__name__}: {e}", LogLevel.ERROR)
