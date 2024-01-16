@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 
 from ... import error, Inu
 from ...const import LogLevel
@@ -179,10 +180,15 @@ class Robotics:
     Robotics manager service.
     """
 
-    def __init__(self, inu: Inu):
+    def __init__(self, inu: Inu, power_up_delay=2500):
         self.inu = inu
         self.devices = {}
         self.logger = logging.getLogger("inu.robotics")
+
+        # Master power state
+        self.powered = False
+        self.power_up_delay = power_up_delay
+        self.idle_time = time.time()
 
         # Currently selected device (eg "A0")
         self.active_device = None
@@ -213,6 +219,8 @@ class Robotics:
         """
         Modifies the power state for all devices.
         """
+        self.powered = powered
+
         for device in self.devices.values():
             device.set_power(powered)
 
@@ -230,6 +238,9 @@ class Robotics:
         """
         int_chain = []
         last_sel = None
+
+        # Brings device power online if it was not already
+        await self.ready_devices()
 
         for ctrl in control_list:
             await self.inu.log(f"EXEC: {ctrl}", LogLevel.DEBUG)
@@ -273,6 +284,15 @@ class Robotics:
                 await self.run_list(int_chain)
                 await self.inu.log("INT seq completed", LogLevel.DEBUG)
 
+    async def ready_devices(self):
+        """
+        If system is unpowered, then power it up and wait for `warmup_delay` ms.
+        Resets idle time.
+        """
+        if not self.powered:
+            self.set_power(True)
+            await asyncio.sleep(self.power_up_delay / 1000)
+
     def reset_state(self):
         """
         Clears device state from a previous run.
@@ -280,6 +300,7 @@ class Robotics:
         self.active_device = None
         self.interrupted = False
         self.allow_interrupt = False
+        self.idle_time = time.time()
 
     async def run_int_list(self, control_list: list):
         """
@@ -340,6 +361,12 @@ class Robotics:
             return True
         else:
             return False
+
+    def get_idle_time(self) -> float:
+        """
+        Returns the time in seconds that the device has been idle.
+        """
+        return time.time() - self.idle_time
 
     @staticmethod
     def control_from_string(ctrl: str) -> Control:

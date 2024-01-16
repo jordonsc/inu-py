@@ -1,5 +1,16 @@
 Change Log
 ==========
+### Build 41
+* Switch now has a built-in tolerance and the limiter tolerance is configurable
+
+### Build 40
+* `idle_power` mode is now a delay function, disabling power after a given period of time
+* Increased limiter tolerance
+
+### Build 39
+* Added a tolerance in Robotics limiters to reduce false-positives from interference
+* Set `idle_power` default to True
+
 ### Build 38
 * Added `alert` to Robotics stepper controllers
 * Added `idle power` settings to Robotics

@@ -26,8 +26,14 @@ class Robotics(Settings, ActionDevice, CooldownDevice):
     cal_seq: str = ""
     cal_seq_hint: str = "Calibration sequence when first initialising"
 
-    idle_power: bool = False
+    idle_power: bool = True
     idle_power_hint: str = "Keep devices powered when robotics is idle"
+
+    idle_period: int = 900
+    idle_period_hint: str = "Inactivity period (s) before a device is considered idle"
+
+    warmup_delay: int = 2500
+    warmup_delay_hint: str = "Time to wait (ms) after powering up devices before starting a sequence"
 
     seq_0: str = ""
     seq_0_hint: str = "Sequence 0 control codes"

@@ -55,6 +55,9 @@ class Build(Utility):
         self.ota_packet = None
         self.state = None
 
+        # Set to True if you want to include config in the OTA update
+        self.force_include_cfg_ota = False
+
     async def run(self):
         """
         Run the device builder.
@@ -65,7 +68,7 @@ class Build(Utility):
             self.logger.error(f"App files for '{device_id[0]}' do not exist")
             exit(1)
 
-        if not self.args.ota:
+        if self.force_include_cfg_ota or not self.args.ota:
             cfg = self.create_config_file(device_id)
             self.logger.info(f"Generated configuration:\n{cfg}")
         else:

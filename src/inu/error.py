@@ -24,3 +24,7 @@ class UnsupportedDeviceType(InuError):
 
 class DeviceAlert(InuError):
     pass
+
+
+class LimitHalt(InuError):
+    pass

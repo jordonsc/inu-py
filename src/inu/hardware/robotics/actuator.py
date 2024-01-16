@@ -7,6 +7,7 @@ from . import Control
 from ..robotics import RoboticsDevice, Move
 from ..switch import Switch
 from ... import error
+from ...const import LogLevel
 
 
 class StepperDriver:
@@ -87,9 +88,10 @@ class Actuator(RoboticsDevice):
         FULL_SPEED = 1
         RAMP_DOWN = 2
         END = 3
+        LIMIT_HALT = 4
 
-    def __init__(self, driver: StepperDriver, screw: Screw, ramp_speed: int = 250,
-                 fwd_stop: Switch = None, rev_stop: Switch = None, allow_sleep: bool = True):
+    def __init__(self, driver: StepperDriver, screw: Screw, ramp_speed: int = 150, halt_ramp_speed: int = 300,
+                 fwd_stop: Switch = None, rev_stop: Switch = None, allow_sleep: bool = True, inu=None):
         """
         `ramp_speed` is the acceleration rate in mm/s to start/stop the stepper.
         `allow_sleep` will allow the device to yield CPU if there is more than MIN_SLEEP_TIME nanoseconds remaining in
@@ -110,9 +112,12 @@ class Actuator(RoboticsDevice):
 
         self.allow_sleep = allow_sleep
         self.ramp_accel = ramp_speed
+        self.halt_accel = halt_ramp_speed
 
         # Displacement of last operation
         self.displacement = 0
+
+        self.inu = inu
 
     def on(self):
         """
@@ -173,10 +178,10 @@ class Actuator(RoboticsDevice):
             self.driver.direction.value(direction)
 
         # Don't even start the stepper if the limiter is already triggered
-        if fwd and self.fwd_stop and await self.fwd_stop.check_state():
+        if fwd and self.fwd_stop and await self.fwd_stop.check_state(no_delay=True):
             return
 
-        if not fwd and self.rev_stop and await self.rev_stop.check_state():
+        if not fwd and self.rev_stop and await self.rev_stop.check_state(no_delay=True):
             return
 
         # Calculate ramp times
@@ -207,7 +212,7 @@ class Actuator(RoboticsDevice):
                 if phase == self.DisplacementPhase.END:
                     break
                 elif phase == self.DisplacementPhase.FULL_SPEED:
-                    self.logger.info("Interrupted")
+                    await self.net_log("Interrupted", LogLevel.DEBUG)
                     phase = self.DisplacementPhase.RAMP_DOWN
                     # Update full-speed time to adjust the ramping calcs
                     op.full_spd_time = run_time - op.ramp_time
@@ -220,12 +225,15 @@ class Actuator(RoboticsDevice):
                 raise error.DeviceAlert()
 
             # Check limiters
-            if fwd and self.fwd_stop and await self.fwd_stop.check_state():
-                self.logger.info("Forward limiter halt")
-                break
-            if not fwd and self.rev_stop and await self.rev_stop.check_state():
-                self.logger.info("Reverse limiter halt")
-                break
+            if phase != self.DisplacementPhase.LIMIT_HALT:
+                if fwd and self.fwd_stop and await self.fwd_stop.check_state():
+                    await self.net_log("Forward limiter halt", LogLevel.DEBUG)
+                    # phase = self.DisplacementPhase.LIMIT_HALT
+                    break
+                if not fwd and self.rev_stop and await self.rev_stop.check_state():
+                    await self.net_log("Reverse limiter halt", LogLevel.DEBUG)
+                    # phase = self.DisplacementPhase.LIMIT_HALT
+                    break
 
             tick = time.time_ns()
             tick_time = tick - last_tick
@@ -239,6 +247,7 @@ class Actuator(RoboticsDevice):
 
             # Update PWM speed/phase
             if phase == self.DisplacementPhase.RAMP_UP:
+                # Accelerating to full speed
                 pos = run_time / op.ramp_time
                 current_speed = min(((op.speed - op.min_speed) * pos) + op.min_speed, op.speed)
                 pwm.freq(self.pulse_rate_from_speed(current_speed))
@@ -246,10 +255,12 @@ class Actuator(RoboticsDevice):
                     self.logger.info(f"Move to full-speed phase at {run_time * 10 ** -9} s; pos {pos}")
                     phase = self.DisplacementPhase.FULL_SPEED
             elif phase == self.DisplacementPhase.FULL_SPEED:
+                # Main run phase at intended speed
                 if run_time >= op.ramp_time + op.full_spd_time:
                     self.logger.info(f"Move to ramp-down phase at {run_time * 10 ** -9} s")
                     phase = self.DisplacementPhase.RAMP_DOWN
             elif phase == self.DisplacementPhase.RAMP_DOWN:
+                # Decelerating to come to a halt
                 pos = 1 - ((run_time - op.full_spd_time - op.ramp_time) / op.ramp_time)
                 current_speed = max(((op.speed - op.min_speed) * pos) + op.min_speed, op.min_speed)
                 pwm.freq(self.pulse_rate_from_speed(current_speed))
@@ -260,13 +271,26 @@ class Actuator(RoboticsDevice):
                     # if we've been interrupted, exit immediately - don't attempt to finish the full distance
                     if not ignore_int and self.interrupted:
                         break
+            elif phase == self.DisplacementPhase.LIMIT_HALT:
+                # A limiter has been triggered, halt as quickly as we possibly can
+                current_speed -= self.halt_accel * (tick_time * 10 ** -9)
+
+                if current_speed <= op.min_speed:
+                    break
+                else:
+                    pwm.freq(self.pulse_rate_from_speed(current_speed))
+
+            elif phase == self.DisplacementPhase.END:
+                # If for some reason we're still under the full distance (shouldn't happen), just crawl the rest of
+                # the way at op.min_speed (we're assuming we're nanometers away..)
+                pass
 
             # Ramp-down/end is time-sensitive, do not allow sleeping (passing CPU to other tasks)
             if phase < self.DisplacementPhase.RAMP_DOWN:
                 await asyncio.sleep(0)
 
         pwm.deinit()
-        self.logger.info(f"Done in {run_time * 10 ** -9} s; displacement: {self.displacement}")
+        await self.net_log(f"Done in {run_time * 10 ** -9} s; displacement: {self.displacement}", LogLevel.DEBUG)
 
     async def execute(self, ctrl: Control, reverse: bool = False):
         await super().execute(ctrl)
@@ -284,6 +308,21 @@ class Actuator(RoboticsDevice):
                 await asyncio.sleep(self.INT_PAUSE_TIME)
                 self.logger.info(f"Interrupt reverse for {self.displacement} mm")
                 await self.drive(self.displacement, ctrl.get_speed(), int(not bool(direction)), ignore_int=True)
+
+    async def net_log(self, msg, level=LogLevel.INFO):
+        if self.inu:
+            await self.inu.log(msg, level)
+        else:
+            if level == LogLevel.DEBUG:
+                self.logger.debug(msg)
+            if level == LogLevel.INFO:
+                self.logger.info(msg)
+            elif level == LogLevel.WARNING:
+                self.logger.warning(msg)
+            elif level == LogLevel.ERROR:
+                self.logger.error(msg)
+            elif level == LogLevel.FATAL:
+                self.logger.fatal(msg)
 
     def __repr__(self):
         return f"Stepper <{self.screw}>"
