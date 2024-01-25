@@ -1,5 +1,9 @@
 Change Log
 ==========
+### Build 42
+* Added `SwitchManager`, allowing other apps to include the Switch app logic
+* Robotics now inherits `SwitchManager`
+
 ### Build 41
 * Switch now has a built-in tolerance and the limiter tolerance is configurable
 

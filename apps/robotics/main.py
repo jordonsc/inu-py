@@ -1,10 +1,10 @@
 import asyncio
 
 from inu import error, const, Status
-from inu.app import InuApp
 from inu.const import LogLevel, Priority
 from inu.hardware.robotics import Robotics, actuator
 from inu.hardware.switch import Switch, SwitchMode
+from inu.lib.switch import SwitchManager
 from inu.schema.command import Jog
 from inu.schema.settings.robotics import Robotics as RoboSettings
 from micro_nats.error import NotFoundError
@@ -14,7 +14,7 @@ from micro_nats.util import Time
 from micro_nats.util.asynchronous import TaskPool
 
 
-class RoboticsApp(InuApp):
+class RoboticsApp(SwitchManager):
     def __init__(self):
         super().__init__(RoboSettings)
         self.pool = TaskPool()
@@ -36,6 +36,7 @@ class RoboticsApp(InuApp):
                 path = path[key]
             return path
 
+        # Robotics actuators
         for device_id, spec in devices.items():
             device_type = device_cfg(spec, ["type"])
             if device_type in actuator.Actuator.CONFIG_ALIASES:
@@ -78,12 +79,14 @@ class RoboticsApp(InuApp):
 
     async def app_init(self):
         self.load_devices()
+        await self.switch_init()
+        self.activate_on_switch = False
 
-        s = "" if len(self.robotics.devices) == 1 else "s"
-        self.logger.info(f"Robotics initialised with {len(self.robotics.devices)} device{s}")
-
-        for device_id, device in self.robotics.devices.items():
-            await self.inu.log(f"Device {device_id}: {device.fwd_stop.min_active} / {device.rev_stop.min_active}")
+        ds = "" if len(self.robotics.devices) == 1 else "s"
+        ss = "" if len(self.switches) == 1 else "es"
+        self.logger.info(
+            f"Robotics initialised with {len(self.robotics.devices)} device{ds} and {len(self.switches)} switch{ss}"
+        )
 
         # Calibration settings
         cal_seq = self.inu.settings.cal_seq.strip()
@@ -134,6 +137,8 @@ class RoboticsApp(InuApp):
                 (self.robotics.get_idle_time() >= self.inu.settings.idle_period):
             await self.inu.log(f"Device idle for {self.robotics.get_idle_time()} s, powering down robotics")
             self.robotics.set_power(False)
+
+        await self.switch_tick()
 
     async def on_trigger(self, code: int):
         # Check for a calibration request (code 101)

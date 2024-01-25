@@ -164,7 +164,7 @@ class InuApp(InuHandler):
                     try:
                         await self.app_tick()
                     except Exception as e:
-                        await self.inu.log(f"Application error - {type(e).__name__}: {e}")
+                        await self.inu.log(f"Application error - {type(e).__name__}: {e}", LogLevel.ERROR)
                         await asyncio.sleep(1)
 
                 await asyncio.sleep(0.01)
