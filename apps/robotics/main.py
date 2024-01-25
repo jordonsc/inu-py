@@ -20,7 +20,6 @@ class RoboticsApp(InuApp):
         self.pool = TaskPool()
         self.robotics = Robotics(self.inu)
         self.jog_consumer = None
-        self.power_delay = 0.25
 
     def load_devices(self):
         """
