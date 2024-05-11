@@ -83,6 +83,8 @@ def get_device_settings_class(dvc: str) -> type:
         return Relay
     elif dvc == DeviceType.SWITCH:
         return sensors.MultiSwitch
+    elif dvc == DeviceType.CAPACITOR:
+        return sensors.Capacitor
     else:
         raise error.UnsupportedDeviceType(f"Unsupported device type: {dvc}")
 

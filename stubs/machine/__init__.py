@@ -378,3 +378,36 @@ class PWM:
         :rtype: int
         """
         pass
+
+
+class TouchPad:
+    """
+    Class for controlling capacitive touch sensor inputs.
+    """
+
+    def __init__(self, pin):
+        """
+        Initialize a TouchPad object.
+
+        :param machine.Pin pin: Pin object to which the touch sensor is connected.
+        """
+        pass
+
+    def read(self):
+        """
+        Read the current value of the touch sensor.
+
+        :return: Current touch sensor value.
+        :rtype: int
+        """
+        pass
+
+    def config(self, value=None):
+        """
+        Get or set the threshold value of the touch sensor.
+
+        :param int value: (Optional) Threshold value.
+        :return: Current threshold value.
+        :rtype: int
+        """
+        pass

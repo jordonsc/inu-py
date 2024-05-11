@@ -70,3 +70,30 @@ class MultiSwitch(Settings):
 
     sw_5: int = -1
     sw_5_hint: str = "Switch 5 override code"
+
+
+class Capacitor(Settings):
+    """
+    ## A capacitive sensor.
+    """
+    trigger_code: int = 0
+    trigger_code_hint: str = "Default `code` to trigger with, if not set by per-switch overrides"
+
+    sensor_low: int = 25000
+    sensor_low_hint: str = "Raw low value for 0% threshold"
+
+    sensor_high: int = 50000
+    sensor_high_hint: str = "Raw high value for 100% threshold"
+
+    trigger_on: int = 50
+    trigger_on_hint: str = "Value as a percentage, to be above or below to activate trigger"
+
+    trigger_off: int = 60
+    trigger_off_hint: str = "Value as a percentage, to be above or below to deactivate trigger"
+
+    refire_delay: int = 0
+    refire_delay_hint: str = "Time in ms to send another trigger when sustained (0 to disable)"
+
+    delay_wait: int = 0
+    delay_wait_hint: str = "Time in ms to wait before triggering at threshold"
+

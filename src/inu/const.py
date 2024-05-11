@@ -33,6 +33,9 @@ class DeviceType:
     # Physical switch(es)
     SWITCH = "switch"
 
+    # Capacitive sensor
+    CAPACITOR = "capacitor"
+
     # Motion, light, distance, etc sensors
     MOTION = "motion"
     RANGE = "range"

@@ -380,7 +380,7 @@ class InuApp(InuHandler):
         """
         self.listen_device_consumers = []
 
-    async def set_state_from_last(self, default: bool = True):
+    async def set_state_from_last(self, enabled_default: bool = True):
         """
         Sets the device state from the last known state.
 
@@ -394,7 +394,11 @@ class InuApp(InuHandler):
             )
 
             stat = Status(last_status.get_payload())
-            await self.inu.status(enabled=stat.enabled, active=False, status="")
+            await self.inu.status(enabled=stat.enabled, active=False, status="", locked=stat.locked)
 
         except NotFoundError:
-            await self.inu.status(enabled=default, active=False, status="")
+            await self.inu.status(enabled=enabled_default, active=False, status="", locked=False)
+
+    @staticmethod
+    def map_value(x, in_min, in_max, out_min, out_max):
+        return max(min((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min, 100), 0)
