@@ -402,12 +402,10 @@ class TouchPad:
         """
         pass
 
-    def config(self, value=None):
+    def config(self, value):
         """
-        Get or set the threshold value of the touch sensor.
+        Set the threshold value of the touch sensor.
 
-        :param int value: (Optional) Threshold value.
-        :return: Current threshold value.
-        :rtype: int
+        :param int value: Threshold value.
         """
         pass
