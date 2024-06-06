@@ -104,6 +104,8 @@ class Wait(Control):
 class Move(Control):
     """
     Move the device, such as an actuator, by a given distance at a given speed.
+
+    MV <distance> <speed>
     """
     CONTROL_CODE = "MV"
     ALIASES = ["M", "MV", "MOVE"]
@@ -130,6 +132,52 @@ class Move(Control):
         return f"MV {self.get_distance()} mm @ {self.get_speed()} mm/s"
 
 
+class Colour(Control):
+    """
+    Set device colour & brightness.
+
+    COL <r> <g> <b> <brightness>
+
+    R/G/B - 0-255
+    Brightness - 0-31
+    """
+    CONTROL_CODE = "COL"
+    ALIASES = ["C", "COL", "COLOUR", "COLOR"]
+
+    def __init__(self, ctrl: str = None):
+        super().__init__(ctrl)
+
+        if self.code not in self.ALIASES or len(self.args) != 4:
+            raise error.Malformed(f"Invalid {self.CONTROL_CODE} control: {ctrl}")
+
+    def get_r(self) -> int:
+        """
+        Get the red value.
+        """
+        return int(self.args[0])
+
+    def get_g(self) -> int:
+        """
+        Get the green value.
+        """
+        return int(self.args[1])
+
+    def get_b(self) -> int:
+        """
+        Get the blue value.
+        """
+        return int(self.args[2])
+
+    def get_brightness(self) -> int:
+        """
+        Get the brightness value.
+        """
+        return int(self.args[3])
+
+    def __repr__(self):
+        return f"COL {self.get_r()}, {self.get_g()}, {self.get_b()} @ {self.get_brightness()}"
+
+
 CONTROL_MAP = {
     """
     Mapping from string codes into control classes.
@@ -143,6 +191,10 @@ CONTROL_MAP = {
     "M": Move,
     "MV": Move,
     "MOVE": Move,
+    "C": Colour,
+    "COL": Colour,
+    "COLOUR": Colour,
+    "COLOR": Colour,
 }
 
 
@@ -151,8 +203,10 @@ class RoboticsDevice:
     Base class for a physical device controller. Must be able to execute Control actions.
     """
 
-    def __init__(self):
+    def __init__(self, inu=None, log_path="inu.robotics"):
         self.interrupted = False
+        self.inu = inu
+        self.logger = logging.getLogger(log_path)
 
     async def execute(self, ctrl: Control, reverse: bool = False):
         """
@@ -173,6 +227,21 @@ class RoboticsDevice:
         Inform an active operation that it has been interrupted, expecting it to reverse action already taken and abort.
         """
         self.interrupted = True
+
+    async def net_log(self, msg, level=LogLevel.INFO):
+        if self.inu:
+            await self.inu.log(msg, level)
+        else:
+            if level == LogLevel.DEBUG:
+                self.logger.debug(msg)
+            if level == LogLevel.INFO:
+                self.logger.info(msg)
+            elif level == LogLevel.WARNING:
+                self.logger.warning(msg)
+            elif level == LogLevel.ERROR:
+                self.logger.error(msg)
+            elif level == LogLevel.FATAL:
+                self.logger.fatal(msg)
 
 
 class Robotics:
@@ -306,7 +375,7 @@ class Robotics:
         """
         Runs a list of operations in reverse order and direction.
         """
-        for ctrl in self.prepare_int_list(control_list):
+        for ctrl in await self.prepare_int_list(control_list):
             await self.inu.log(f"REV EXEC: {ctrl}", LogLevel.DEBUG)
             await asyncio.sleep(0)
 
@@ -324,7 +393,7 @@ class Robotics:
 
                 await self.devices[self.active_device].execute(ctrl, reverse=True)
 
-    def prepare_int_list(self, control_list: list):
+    async def prepare_int_list(self, control_list: list):
         """
         Reverse the list, moving SEL statements to the front of their controls.
 

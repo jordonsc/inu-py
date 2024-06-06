@@ -119,6 +119,7 @@ class Build(Utility):
         self.send_files("src/inu", "inu")
         self.send_files("src/micro_nats", "micro_nats")
         self.send_files("src/wifi", "wifi")
+        self.send_files("src/apa102", "apa102")
         self.send_files("src/util", "util")
 
         # MicroPython libs

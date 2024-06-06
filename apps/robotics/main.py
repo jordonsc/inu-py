@@ -2,7 +2,7 @@ import asyncio
 
 from inu import error, const, Status
 from inu.const import LogLevel, Priority
-from inu.hardware.robotics import Robotics, actuator
+from inu.hardware.robotics import Robotics, actuator, apa102
 from inu.hardware.switch import Switch, SwitchMode
 from inu.lib.switch import SwitchManager
 from inu.schema.command import Jog
@@ -39,6 +39,16 @@ class RoboticsApp(SwitchManager):
         # Robotics actuators
         for device_id, spec in devices.items():
             device_type = device_cfg(spec, ["type"])
+            self.logger.info(f"Adding device: {device_id} ({device_type})")
+
+            # -- APA102 --
+            if device_type in apa102.Apa102.CONFIG_ALIASES:
+                self.robotics.add_device(device_id, apa102.Apa102(
+                    num_leds=device_cfg(spec, ["num_leds"], 144),
+                    spi_index=device_cfg(spec, ["spi"], 1),
+                ))
+
+            # -- ACTUATOR --
             if device_type in actuator.Actuator.CONFIG_ALIASES:
                 # limit switches
                 fwd_sw = None
@@ -78,7 +88,9 @@ class RoboticsApp(SwitchManager):
                 ))
 
     async def app_init(self):
+        self.logger.info("Initialising devices..")
         self.load_devices()
+        self.logger.info("Initialising switches..")
         await self.switch_init()
         self.activate_on_switch = False
 

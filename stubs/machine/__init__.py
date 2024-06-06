@@ -152,7 +152,7 @@ class Pin:
     PULL_DOWN = 1
     PULL_UP = 2
 
-    def __init__(self, pin, mode, pull=None):
+    def __init__(self, pin, mode=IN, pull=None):
         """
         Initialize a Pin object.
 
@@ -407,5 +407,64 @@ class TouchPad:
         Set the threshold value of the touch sensor.
 
         :param int value: Threshold value.
+        """
+        pass
+
+
+class SPI:
+    """
+    Class for controlling SPI (Serial Peripheral Interface) communication.
+    """
+
+    def __init__(self, id, baudrate=1000000, polarity=0, phase=0, bits=8, firstbit=0, sck=None, mosi=None, miso=None):
+        """
+        Initialize an SPI object.
+
+        :param int id: SPI ID (0 or 1).
+        :param int baudrate: (Optional) Baud rate in Hz (default is 1000000).
+        :param int polarity: (Optional) Clock polarity (0 or 1, default is 0).
+        :param int phase: (Optional) Clock phase (0 or 1, default is 0).
+        :param int bits: (Optional) Number of bits per transfer (default is 8).
+        :param int firstbit: (Optional) First bit to send (0 or 1, default is 0).
+        :param machine.Pin sck: (Optional) Pin object for the clock signal.
+        :param machine.Pin mosi: (Optional) Pin object for the MOSI signal.
+        :param machine.Pin miso: (Optional) Pin object for the MISO signal.
+        """
+        pass
+
+    def init(self, baudrate=1000000, polarity=0, phase=0, bits=8, firstbit=0, sck=None, mosi=None, miso=None):
+        """
+        Reinitialize the SPI object.
+
+        :param int baudrate: (Optional) Baud rate in Hz (default is 1000000).
+        :param int polarity: (Optional) Clock polarity (0 or 1, default is 0).
+        :param int phase: (Optional) Clock phase (0 or 1, default is 0).
+        :param int bits: (Optional) Number of bits per transfer (default is 8).
+        :param int firstbit: (Optional) First bit to send (0 or 1, default is 0).
+        :param machine.Pin sck: (Optional) Pin object for the clock signal.
+        :param machine.Pin mosi: (Optional) Pin object for the MOSI signal.
+        :param machine.Pin miso: (Optional) Pin object for the MISO signal.
+        """
+        pass
+
+    def write(self, data):
+        """
+        Write data to the SPI interface.
+
+        :param data: Data to write.
+        """
+        pass
+
+    def read(self, nbytes):
+        """
+        Read data from the SPI interface.
+
+        :param nbytes: Number of bytes to read.
+        """
+        pass
+
+    def deinit(self):
+        """
+        Deinitialize the SPI object.
         """
         pass

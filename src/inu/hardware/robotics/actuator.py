@@ -63,10 +63,10 @@ class OpVector:
 
     def __repr__(self):
         return f"<op ramp_in={round(self.ramp_time * 10 ** -9, 2)} " + \
-               f"full_spd={round(self.full_spd_time * 10 ** -9, 2)} " + \
-               f"ramp_out={round(self.ramp_time * 10 ** -9, 2)} " + \
-               f"accel={self.ramp_accel} " + \
-               f"op_time={round(self.op_time * 10 ** -9, 2)}>"
+            f"full_spd={round(self.full_spd_time * 10 ** -9, 2)} " + \
+            f"ramp_out={round(self.ramp_time * 10 ** -9, 2)} " + \
+            f"accel={self.ramp_accel} " + \
+            f"op_time={round(self.op_time * 10 ** -9, 2)}>"
 
 
 class Actuator(RoboticsDevice):
@@ -97,8 +97,7 @@ class Actuator(RoboticsDevice):
         `allow_sleep` will allow the device to yield CPU if there is more than MIN_SLEEP_TIME nanoseconds remaining in
         the operation.
         """
-        super().__init__()
-        self.logger = logging.getLogger("inu.robotics.actuator")
+        super().__init__(inu=inu, log_path="inu.robotics.actuator")
 
         self.driver = driver
         self.screw = screw
@@ -116,8 +115,6 @@ class Actuator(RoboticsDevice):
 
         # Displacement of last operation
         self.displacement = 0
-
-        self.inu = inu
 
     def on(self):
         """
@@ -308,21 +305,6 @@ class Actuator(RoboticsDevice):
                 await asyncio.sleep(self.INT_PAUSE_TIME)
                 self.logger.info(f"Interrupt reverse for {self.displacement} mm")
                 await self.drive(self.displacement, ctrl.get_speed(), int(not bool(direction)), ignore_int=True)
-
-    async def net_log(self, msg, level=LogLevel.INFO):
-        if self.inu:
-            await self.inu.log(msg, level)
-        else:
-            if level == LogLevel.DEBUG:
-                self.logger.debug(msg)
-            if level == LogLevel.INFO:
-                self.logger.info(msg)
-            elif level == LogLevel.WARNING:
-                self.logger.warning(msg)
-            elif level == LogLevel.ERROR:
-                self.logger.error(msg)
-            elif level == LogLevel.FATAL:
-                self.logger.fatal(msg)
 
     def __repr__(self):
         return f"Stepper <{self.screw}>"

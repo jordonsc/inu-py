@@ -308,6 +308,8 @@ class InuApp(InuHandler):
             )
             self.listen_device_consumers.append(cons.name)
 
+            await self.inu.log(f"Resubscribe to listen devices completed", LogLevel.INFO)
+
         except Exception as e:
             await self.inu.log(f"Error updating settings: {type(e)}: {e}", LogLevel.FATAL)
 
