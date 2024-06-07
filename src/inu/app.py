@@ -179,7 +179,7 @@ class InuApp(InuHandler):
         """
         pass
 
-    async def parse_trigger_code(self, code: int):
+    async def parse_trigger_code(self, code: int, msg):
         """
         Appropriately process a trigger message for the given code.
 
@@ -188,6 +188,9 @@ class InuApp(InuHandler):
         """
         if code == const.TriggerCode.INTERRUPT:
             await self.on_interrupt()
+        elif code == const.TriggerCode.RESET_ACTIVE:
+            await self.inu.log(f"Indiscriminately resetting active state by user request", LogLevel.WARNING)
+            await self.inu.status(active=False, status="")
         elif code == const.TriggerCode.ENABLE_TOGGLE:
             await self.inu.status(enabled=not self.inu.state.enabled, status="")
             await self.on_enabled_changed(self.inu.state.enabled)
@@ -240,7 +243,7 @@ class InuApp(InuHandler):
                     return
 
                 self.logger.info(f"Trigger from {msg.subject}: code {code}")
-                await self.parse_trigger_code(code)
+                await self.parse_trigger_code(code, msg)
 
             # Even if we don't have listen subjects, listen to your own "central" address
             if not hasattr(self.inu.settings, 'listen_subjects'):

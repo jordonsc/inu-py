@@ -46,6 +46,7 @@ class RoboticsApp(SwitchManager):
                 self.robotics.add_device(device_id, apa102.Apa102(
                     num_leds=device_cfg(spec, ["num_leds"], 144),
                     spi_index=device_cfg(spec, ["spi"], 1),
+                    segments=device_cfg(spec, ["segments"], None),
                 ))
 
             # -- ACTUATOR --
@@ -88,26 +89,25 @@ class RoboticsApp(SwitchManager):
                 ))
 
     async def app_init(self):
-        self.logger.info("Initialising devices..")
-        self.load_devices()
-        self.logger.info("Initialising switches..")
-        await self.switch_init()
-        self.activate_on_switch = False
-
-        ds = "" if len(self.robotics.devices) == 1 else "s"
-        ss = "" if len(self.switches) == 1 else "es"
-        self.logger.info(
-            f"Robotics initialised with {len(self.robotics.devices)} device{ds} and {len(self.switches)} switch{ss}"
-        )
-
-        # Calibration settings
-        cal_seq = self.inu.settings.cal_seq.strip()
-        if cal_seq and cal_seq[0] != "#":
-            await self.run_calibration(cal_seq)
-            return
-
-        # We'll decide if we power up enabled by checking the previous device state and determining if it is safe -
+        cal_seq = None
         try:
+            self.load_devices()
+            await self.switch_init()
+            self.activate_on_switch = False
+
+            ds = "" if len(self.robotics.devices) == 1 else "s"
+            ss = "" if len(self.switches) == 1 else "es"
+            self.logger.info(
+                f"Robotics initialised with {len(self.robotics.devices)} device{ds} and {len(self.switches)} switch{ss}"
+            )
+
+            # Calibration settings
+            cal_seq = self.inu.settings.cal_seq.strip()
+            if cal_seq and cal_seq[0] != "#":
+                await self.run_calibration(cal_seq)
+                return
+
+            # We'll decide if we power up enabled by checking the previous device state and determining if it is safe -
             last_status = await self.inu.js.msg.get_last(
                 const.Streams.STATUS,
                 const.Subjects.fqs(const.Subjects.STATUS, self.inu.device_id)
@@ -143,6 +143,9 @@ class RoboticsApp(SwitchManager):
                 await self.inu.status(enabled=False, active=False, status="Safe start")
                 self.robotics.set_power(False)
 
+        except Exception as e:
+            self.logger.fatal(f"App init failed: {e}")
+
     async def app_tick(self):
         # Check if the device has gone idle long enough to deactivate the power
         if not self.inu.settings.idle_power and not self.inu.state.active and self.robotics.powered and \
@@ -156,13 +159,13 @@ class RoboticsApp(SwitchManager):
         # Check for a calibration request (code 101)
         if code == const.TriggerCode.CALIBRATE:
             if self.inu.state.enabled:
-                self.inu.log("Cannot calibrate while enabled", LogLevel.WARNING)
+                await self.inu.log("Cannot calibrate while enabled", LogLevel.WARNING)
             else:
                 cal_seq = self.inu.settings.cal_seq.strip()
                 if cal_seq and cal_seq[0] != "#":
                     await self.run_calibration(cal_seq)
                 else:
-                    self.inu.log("Not calibration sequence configured", LogLevel.WARNING)
+                    await self.inu.log("Not calibration sequence configured", LogLevel.WARNING)
             return
 
         if not self.inu.state.can_act():

@@ -150,6 +150,7 @@ class Streams:
 class TriggerCode:
     INTERRUPT = 100
     CALIBRATE = 101
+    RESET_ACTIVE = 102
 
     ENABLE_TOGGLE = 110
     ENABLE_ON = 111

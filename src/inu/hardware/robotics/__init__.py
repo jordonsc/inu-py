@@ -10,13 +10,20 @@ class Control:
     """
     Controls represent actions that can be taken and are constructed from a control string. eg:
         SEL A0; MV 800 300; W 2000 INT; MV -800 150 INT
+        SEL L0:0: COL 255 0 0; SEL L0:1; COL 0 0 255!
     """
     INTERRUPT_CODE = "INT"
+    EXECUTE_CODE = "!"
     DELIMITER = ";"
 
     def __init__(self, cmd: str):
+        # Allow the current operation to be interrupted by an INT signal
         self.allow_int = False
+        # Instruct the operation to commit/write/execute - required for light changes, etc.
+        self.execute = False
+        # The control code
         self.code = None
+        # Arguments for the control code
         self.args = []
 
         if cmd is not None:
@@ -42,6 +49,8 @@ class Control:
             arg = args.pop(0)
             if arg == self.INTERRUPT_CODE:
                 self.allow_int = True
+            elif arg == self.EXECUTE_CODE:
+                self.execute = True
             else:
                 self.args.append(arg)
 
@@ -64,9 +73,15 @@ class Select(Control):
 
     def get_device(self) -> str:
         """
-        Returns the selection subject.
+        Returns the selection subject ("XX" from "SEL XX:YY").
         """
-        return self.args[0]
+        return self.args[0].split(":")[0]
+
+    def get_component(self) -> str:
+        """
+        Returns the selection component ("TT" from "SEL XX:YY").
+        """
+        return self.args[0].split(":")[1] if ":" in self.args[0] else None
 
     def allow_interrupt(self) -> bool:
         """
@@ -136,10 +151,11 @@ class Colour(Control):
     """
     Set device colour & brightness.
 
-    COL <r> <g> <b> <brightness>
+    COL <r> <g> <b> <brightness> <!>
 
     R/G/B - 0-255
     Brightness - 0-31
+    ! - required to commit the change
     """
     CONTROL_CODE = "COL"
     ALIASES = ["C", "COL", "COLOUR", "COLOR"]
@@ -147,7 +163,7 @@ class Colour(Control):
     def __init__(self, ctrl: str = None):
         super().__init__(ctrl)
 
-        if self.code not in self.ALIASES or len(self.args) != 4:
+        if self.code not in self.ALIASES or 3 > len(self.args) < 5:
             raise error.Malformed(f"Invalid {self.CONTROL_CODE} control: {ctrl}")
 
     def get_r(self) -> int:
@@ -172,10 +188,69 @@ class Colour(Control):
         """
         Get the brightness value.
         """
-        return int(self.args[3])
+        return int(self.args[3]) if len(self.args) > 3 else 31
 
     def __repr__(self):
         return f"COL {self.get_r()}, {self.get_g()}, {self.get_b()} @ {self.get_brightness()}"
+
+
+class Fx(Control):
+    """
+    LED FX control.
+
+    FX <r> <g> <b> <duration> <fx>
+
+    R/G/B - 0-255
+    duration - time in milliseconds
+    FX - one of: FADE, SWEEP_LEFT, SWEEP_RIGHT, PULSE_LEFT, PULSE_RIGHT
+    """
+    CONTROL_CODE = "FX"
+
+    class FX:
+        FADE = "FADE"
+        SWEEP_LEFT = "SWEEP_LEFT"
+        SWEEP_RIGHT = "SWEEP_RIGHT"
+        PULSE_LEFT = "PULSE_LEFT"
+        PULSE_RIGHT = "PULSE_RIGHT"
+
+    def __init__(self, ctrl: str = None):
+        super().__init__(ctrl)
+
+        if len(self.args) != 5:
+            raise error.Malformed(f"Invalid {self.CONTROL_CODE} control: {ctrl}")
+
+    def get_r(self) -> int:
+        """
+        Get the red value.
+        """
+        return int(self.args[0])
+
+    def get_g(self) -> int:
+        """
+        Get the green value.
+        """
+        return int(self.args[1])
+
+    def get_b(self) -> int:
+        """
+        Get the blue value.
+        """
+        return int(self.args[2])
+
+    def get_duration(self) -> int:
+        """
+        Get the duration value in milliseconds.
+        """
+        return int(self.args[3])
+
+    def get_fx(self) -> str:
+        """
+        Get the FX value.
+        """
+        return self.args[4]
+
+    def __repr__(self):
+        return f"FX {self.get_r()}, {self.get_g()}, {self.get_b()} -> {self.get_fx()}"
 
 
 CONTROL_MAP = {
@@ -195,6 +270,7 @@ CONTROL_MAP = {
     "COL": Colour,
     "COLOUR": Colour,
     "COLOR": Colour,
+    "FX": Fx,
 }
 
 
@@ -227,6 +303,15 @@ class RoboticsDevice:
         Inform an active operation that it has been interrupted, expecting it to reverse action already taken and abort.
         """
         self.interrupted = True
+
+    def select_component(self, component_id):
+        """
+        If supported, select a sub-component of the device. This is selected by using the Control code "SEL XX:YY",
+        where YY could be the `component_id`.
+
+        `None` will be used if the control selection does not include a component (eg. "SEL XX").
+        """
+        print("Select component", component_id)
 
     async def net_log(self, msg, level=LogLevel.INFO):
         if self.inu:
@@ -283,6 +368,7 @@ class Robotics:
             raise error.BadRequest(f"Device '{device.get_device()}' not registered")
 
         self.active_device = device.get_device()
+        self.devices[self.active_device].select_component(device.get_component())
 
     def set_power(self, powered: bool):
         """
