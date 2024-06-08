@@ -202,16 +202,16 @@ class Fx(Control):
 
     R/G/B - 0-255
     duration - time in milliseconds
-    FX - one of: FADE, SWEEP_LEFT, SWEEP_RIGHT, PULSE_LEFT, PULSE_RIGHT
+    FX - one of: FADE, SLIDEL, SLIDER, PULSEL, PULSER
     """
     CONTROL_CODE = "FX"
 
     class FX:
         FADE = "FADE"
-        SWEEP_LEFT = "SWEEP_LEFT"
-        SWEEP_RIGHT = "SWEEP_RIGHT"
-        PULSE_LEFT = "PULSE_LEFT"
-        PULSE_RIGHT = "PULSE_RIGHT"
+        SLIDE_L = "SLIDEL"
+        SLIDE_R = "SLIDER"
+        PULSE_L = "PULSEL"
+        PULSE_R = "PULSER"
 
     def __init__(self, ctrl: str = None):
         super().__init__(ctrl)
@@ -247,7 +247,11 @@ class Fx(Control):
         """
         Get the FX value.
         """
-        return self.args[4]
+        fx = self.args[4].upper().strip()
+        if fx not in [self.FX.FADE, self.FX.SLIDE_L, self.FX.SLIDE_R, self.FX.PULSE_L, self.FX.PULSE_R]:
+            return self.FX.FADE
+        else:
+            return fx
 
     def __repr__(self):
         return f"FX {self.get_r()}, {self.get_g()}, {self.get_b()} -> {self.get_fx()}"
