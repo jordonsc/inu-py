@@ -20,9 +20,19 @@ class LightSensorApp(InuApp):
         VEML6030 = "VEML6030"
         BH1750 = "BH1750"
 
-    def __init__(self, chip_type: str = SensorChip.BH1750):
+    def __init__(self):
         super().__init__(CapacitorSettings)
-        self.sensor = VEML6030() if chip_type == self.SensorChip.VEML6030 else BH1750()
+
+        chip_type = self.get_config(["light", "type"], "- not configured -")
+        if chip_type == self.SensorChip.VEML6030:
+            self.logger.info("Using VEML6030 light sensor")
+            self.sensor = VEML6030()
+        elif chip_type == self.SensorChip.BH1750:
+            self.logger.info("Using BH1750 light sensor")
+            self.sensor = BH1750()
+        else:
+            raise ValueError(f"Unknown sensor chip type: {chip_type}")
+
         self.last_poll = time.time()
         self.active = False
         self.new_state = False

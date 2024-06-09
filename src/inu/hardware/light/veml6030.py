@@ -1,72 +1,36 @@
+import time
+from machine import I2C
 from . import AmbientLightSensor
 
 
 class VEML6030(AmbientLightSensor):
-    VEML6030_ADDR = 0x10
-    ALS_CONF = 0x00
-    REG_ALS = 0x04
+    # VEML6030 I2C address
+    I2C_ADDR = 0x10
 
-    # initialise gain:1x, integration 100ms, persistence 1, disable interrupt
-    DEFAULT_SETTINGS = b'\x00'
+    # Configuration register
+    ALS_CONF = 0x00  # Ambient Light Sensor (ALS) configuration register
 
-    def __init__(self, bus=None, freq=None, sda=None, scl=None, addr=VEML6030_ADDR):
-        self.i2c = create_unified_i2c(bus=bus, freq=freq, sda=sda, scl=scl)
-        self.addr = addr
-        self.gain = 1
-        self.res = 0.0576  # [lx/bit]
-        self.i2c.writeto_mem(self.addr, VEML6030.ALS_CONF, VEML6030.DEFAULT_SETTINGS)
-        sleep_ms(4)
+    # lux/bit
+    RESOLUTION = 0.0576
+
+    class GAIN:
+        GAIN_1 = 0x00  # Gain x1
+        GAIN_2 = 0x01  # Gain x2
+        GAIN_1_8 = 0x02  # Gain x1/8
+        GAIN_1_4 = 0x03  # Gain x1/4
+
+    def __init__(self, i2c_id=1, gain=GAIN.GAIN_1):
+        self.i2c = I2C(i2c_id)
+        self.config = bytearray(2)
+        self.set_config(gain)  # Set ALS gain and integration time
 
     def read(self):
-        try:
-            data = self.i2c.readfrom_mem(self.addr, VEML6030.REG_ALS, 2)
-        except:
-            print(i2c_err_str.format(self.addr))
-            return float('NaN')
-        return int.from_bytes(data, 'little') * self.res
+        # Read ALS data from 0x04 register
+        data = self.i2c.readfrom_mem(self.I2C_ADDR, 0x04, 2)
+        return ((data[0] << 8) | data[1]) * VEML6030.RESOLUTION
 
-    def set_gain(self, g):
-        """
-        Set the gain of the sensor.
-
-        :param g: One of: 0.125, 0.5, 1, 2
-        :return:
-        """
-        if g == 0.125:
-            conf = b'\x00\x10'
-            self.res = 0.4608
-        elif g == 0.25:
-            conf = b'\x00\x18'
-            self.res = 0.2304
-        elif g == 1:
-            conf = b'\x00\x00'
-            self.res = 0.0576
-        elif g == 2:
-            conf = b'\x00\x08'
-            self.res = 0.0288
-        else:
-            raise ValueError('Invalid gain. Accepted values: 0.125, 0.25, 1, 2')
-
-        self.gain = g
-        self.set_bits(VEML6030.ALS_CONF, conf, 'b\x18\x00')
-        sleep_ms(4)
-
-        return
-
-    def set_bits(self, address, byte, mask):
-        old_byte = int.from_bytes(self.i2c.readfrom_mem(self.addr, address, 2), 'little')
-        temp_byte = old_byte
-        int_byte = int.from_bytes(byte, "little")
-        int_mask = int.from_bytes(mask, "big")
-
-        # Cycle through each bit
-        for n in range(16):
-            bit_mask = (int_mask >> n) & 1
-            if bit_mask == 1:
-                if ((int_byte >> n) & 1) == 1:
-                    temp_byte = temp_byte | 1 << n
-                else:
-                    temp_byte = temp_byte & ~(1 << n)
-
-        new_byte = temp_byte
-        self.i2c.writeto_mem(self.addr, address, new_byte.to_bytes(2, 'little'))
+    def set_config(self, value):
+        self.config[0] = value & 0xFF
+        self.config[1] = (value >> 8) & 0xFF
+        self.i2c.writeto_mem(self.I2C_ADDR, VEML6030.ALS_CONF, self.config)
+        time.sleep(0.2)
