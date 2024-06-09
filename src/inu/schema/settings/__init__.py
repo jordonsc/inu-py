@@ -85,6 +85,8 @@ def get_device_settings_class(dvc: str) -> type:
         return sensors.MultiSwitch
     elif dvc == DeviceType.CAPACITOR:
         return sensors.Capacitor
+    elif dvc == DeviceType.LIGHT:
+        return sensors.LightSensor
     else:
         raise error.UnsupportedDeviceType(f"Unsupported device type: {dvc}")
 

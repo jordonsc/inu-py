@@ -39,6 +39,7 @@ class DeviceType:
     # Motion, light, distance, etc sensors
     MOTION = "motion"
     RANGE = "range"
+    LIGHT = "light"
 
     # Motorised actuator or physical pulley, winch, etc
     ROBOTICS = "robotics"

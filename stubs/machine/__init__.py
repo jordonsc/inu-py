@@ -468,3 +468,29 @@ class SPI:
         Deinitialize the SPI object.
         """
         pass
+
+
+class I2C:
+    def __init__(self, bus, scl=None, sda=None, freq=400000):
+        pass
+
+    def scan(self):
+        pass
+
+    def readfrom(self, addr, nbytes):
+        pass
+
+    def readfrom_into(self, addr, buf):
+        pass
+
+    def writeto(self, addr, buf):
+        pass
+
+    def readfrom_mem(self, addr, memaddr, nbytes):
+        pass
+
+    def readfrom_mem_into(self, addr, memaddr, buf):
+        pass
+
+    def writeto_mem(self, addr, memaddr, buf):
+        pass

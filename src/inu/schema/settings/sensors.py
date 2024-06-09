@@ -97,3 +97,22 @@ class Capacitor(Settings):
     delay_wait: int = 0
     delay_wait_hint: str = "Time in ms to wait before triggering at threshold"
 
+
+class LightSensor(Settings):
+    """
+    ## An ambient light sensor.
+    """
+    trigger_code: int = 0
+    trigger_code_hint: str = "Default `code` to trigger with, if not set by per-switch overrides"
+
+    trigger_on: int = 5
+    trigger_on_hint: str = "Value in lux, to be above or below to activate trigger"
+
+    trigger_off: int = 15
+    trigger_off_hint: str = "Value in lux, to be above or below to deactivate trigger"
+
+    refire_delay: int = 0
+    refire_delay_hint: str = "Time in ms to send another trigger when sustained (0 to disable)"
+
+    delay_wait: int = 0
+    delay_wait_hint: str = "Time in ms to wait before triggering at threshold"
