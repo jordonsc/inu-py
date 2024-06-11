@@ -29,7 +29,8 @@ default `Relay` application, which will act like so for different codes:
 While each device might behave in its own special way for different codes, there are "standard" codes that are built
 into the core of the `InuApp` which will define special logic:
 
-* `100`: INTERRUPT signal (typically used in robotics)
+* `100`: INTERRUPT signal (typically used in robotics) - interrupts the currently running sequence
+* `101`: CALIBRATE signal (typically used in robotics) - forces the device to run the calibration sequence
 * `110`: Toggle device ENABLE state (an on/off toggle for the listen device)
 * `111`: Enable the device
 * `112`: Disable the device

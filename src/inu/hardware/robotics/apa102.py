@@ -24,36 +24,24 @@ class Apa102(RoboticsDevice):
 
         if isinstance(ctrl, Colour):
             # Fill the strip/segment fully & instantly with a single colour
-            self.leds.fill(ctrl.get_r(), ctrl.get_g(), ctrl.get_b(), ctrl.get_brightness(), write=ctrl.execute)
+            self.leds.fill(ctrl.colour, write=ctrl.execute)
         elif isinstance(ctrl, Fx):
             # Fx transitions -
             if ctrl.get_fx() == Fx.FX.FADE:
                 # Full segment fade to colour
-                self.leds.fade(ctrl.get_r(), ctrl.get_g(), ctrl.get_b(), 31, ctrl.get_duration())
+                self.leds.fade(ctrl.colour, ctrl.get_duration())
             elif ctrl.get_fx() == Fx.FX.SLIDE_L:
                 # Slide "left"
-                self.leds.slide(
-                    ctrl.get_r(), ctrl.get_g(), ctrl.get_b(), 31, ctrl.get_duration(),
-                    direction=LedStrip.DIRECTION.LEFT
-                )
+                self.leds.slide(ctrl.colour, ctrl.get_duration(), direction=LedStrip.DIRECTION.LEFT)
             elif ctrl.get_fx() == Fx.FX.SLIDE_R:
                 # Slide "right"
-                self.leds.slide(
-                    ctrl.get_r(), ctrl.get_g(), ctrl.get_b(), 31, ctrl.get_duration(),
-                    direction=LedStrip.DIRECTION.RIGHT
-                )
+                self.leds.slide(ctrl.colour, ctrl.get_duration(), direction=LedStrip.DIRECTION.RIGHT)
             elif ctrl.get_fx() == Fx.FX.PULSE_L:
                 # Pulse "left"
-                self.leds.pulse(
-                    ctrl.get_r(), ctrl.get_g(), ctrl.get_b(), 31, ctrl.get_duration(),
-                    direction=LedStrip.DIRECTION.LEFT
-                )
+                self.leds.pulse(ctrl.colour, ctrl.get_duration(), direction=LedStrip.DIRECTION.LEFT)
             elif ctrl.get_fx() == Fx.FX.PULSE_R:
                 # Pulse "right"
-                self.leds.pulse(
-                    ctrl.get_r(), ctrl.get_g(), ctrl.get_b(), 31, ctrl.get_duration(),
-                    direction=LedStrip.DIRECTION.RIGHT
-                )
+                self.leds.pulse(ctrl.colour, ctrl.get_duration(), direction=LedStrip.DIRECTION.RIGHT)
 
     def select_component(self, component_id):
         self.leds.select_segment(component_id)

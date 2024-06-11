@@ -8,6 +8,7 @@ network with self-contained communication, logging & alerting for automation sys
 * [Device Communication](docs/Device_Communication.md)
   * [Commands](docs/Commands.md)
 * [Hardware](docs/Hardware.md)
+* [Supported Devices](docs/Supported_Devices.md)
 * [Configuration](docs/Config.md)
 
 MicroNats

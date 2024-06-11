@@ -4,6 +4,7 @@ import glob
 import json
 import logging
 import os
+import re
 import shutil
 import struct
 import tarfile
@@ -70,7 +71,8 @@ class Build(Utility):
 
         if self.force_include_cfg_ota or not self.args.ota:
             cfg = self.create_config_file(device_id)
-            self.logger.info(f"Generated configuration:\n{cfg}")
+            print_cfg = re.sub(r'"password": "(.*)"', '"password": "********"', cfg)
+            self.logger.info(f"Generated configuration:\n{print_cfg}")
         else:
             cfg = None
             self.logger.info(f"Generating OTA package for {device_id[0]} v{const.INU_BUILD}")
