@@ -2,11 +2,13 @@ import asyncio
 import time
 
 from machine import Pin, PWM
-from . import Control
-from ..robotics import RoboticsDevice, Move
 from ..switch import Switch
 from ... import error
 from ...const import LogLevel
+
+from . import RoboticsDevice
+from .control import Control
+from .control.actuator import Move
 
 
 class StepperDriver:

@@ -1,6 +1,6 @@
 import time
 
-from inu.hardware.robotics import ColourCode
+from inu.hardware.robotics.colour import ColourCode
 from machine import SPI
 
 

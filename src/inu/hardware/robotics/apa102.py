@@ -1,11 +1,12 @@
 from apa102 import Apa102 as LedStrip
-from . import Control
-from ..robotics import RoboticsDevice, Colour, Fx
+from . import RoboticsDevice
+from .control import Control
+from .control.lights import Colour, Fx
 
 
 class Apa102(RoboticsDevice):
     """
-    APA102[c] LED strip.
+    APA102 LED strip.
     """
     CONFIG_ALIASES = ["apa102", "apa102c"]
 

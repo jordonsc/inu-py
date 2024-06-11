@@ -2,222 +2,13 @@ import asyncio
 import logging
 import time
 
-from .colour import ColourCode
-from ... import error, Inu
+from ... import error, Inu, const
 from ...const import LogLevel
 
-
-class Control:
-    """
-    Controls represent actions that can be taken and are constructed from a control string. eg:
-        SEL A0; MV 800 300; W 2000 INT; MV -800 150 INT
-        SEL L0:0: COL 255 0 0; SEL L0:1; COL 0 0 255!
-    """
-    INTERRUPT_CODE = "INT"
-    EXECUTE_CODE = "!"
-    DELIMITER = ";"
-
-    def __init__(self, cmd: str):
-        # Allow the current operation to be interrupted by an INT signal
-        self.allow_int = False
-        # Instruct the operation to commit/write/execute - required for light changes, etc.
-        self.execute = False
-        # The control code
-        self.code = None
-        # Arguments for the control code
-        self.args = []
-
-        if cmd is not None:
-            self._parse(cmd)
-
-    def allow_interrupt(self) -> bool:
-        """
-        Check if this control allowed interruption.
-        """
-        return self.allow_int
-
-    def _parse(self, cmd: str):
-        """
-        Breaks down `cmd` into args, separating special operators.
-        """
-        args = cmd.strip().upper().split(" ")
-        if len(args) < 2:
-            raise error.Malformed(f"Invalid control string: {cmd}")
-
-        self.code = args.pop(0)
-
-        while len(args):
-            arg = args.pop(0)
-            if arg == self.INTERRUPT_CODE:
-                self.allow_int = True
-            elif arg == self.EXECUTE_CODE:
-                self.execute = True
-            else:
-                self.args.append(arg)
-
-        if len(self.args) < 1:
-            raise error.Malformed(f"No control arguments: {cmd}")
-
-
-class Select(Control):
-    """
-    Select the active device. Should precede execution controls like MV.
-    """
-    CONTROL_CODE = "SEL"
-    ALIASES = ["SEL", "S", "SELECT"]
-
-    def __init__(self, ctrl: str = None):
-        super().__init__(ctrl)
-
-        if self.code not in self.ALIASES or len(self.args) != 1:
-            raise error.Malformed(f"Invalid {self.CONTROL_CODE} control: {ctrl}")
-
-    def get_device(self) -> str:
-        """
-        Returns the selection subject ("XX" from "SEL XX:YY").
-        """
-        return self.args[0].split(":")[0]
-
-    def get_component(self) -> str:
-        """
-        Returns the selection component ("TT" from "SEL XX:YY").
-        """
-        return self.args[0].split(":")[1] if ":" in self.args[0] else None
-
-    def allow_interrupt(self) -> bool:
-        """
-        Select Controls have no concept of interrupts but should not block the interrupt chain.
-        """
-        return True
-
-    def __repr__(self):
-        return f"SEL {self.get_device()}"
-
-
-class Wait(Control):
-    """
-    Delay by a given time in milliseconds.
-    """
-    CONTROL_CODE = "WAIT"
-    ALIASES = ["W", "WAIT"]
-
-    def __init__(self, ctrl: str = None):
-        super().__init__(ctrl)
-
-        if self.code not in self.ALIASES or len(self.args) != 1:
-            raise error.Malformed(f"Invalid {self.CONTROL_CODE} control: {ctrl}")
-
-    def get_time(self) -> int:
-        """
-        Wait time as an integer in milliseconds.
-        """
-        return int(self.args[0])
-
-    def __repr__(self):
-        return f"WAIT {self.get_time()}"
-
-
-class Move(Control):
-    """
-    Move the device, such as an actuator, by a given distance at a given speed.
-
-    MV <distance> <speed>
-    """
-    CONTROL_CODE = "MV"
-    ALIASES = ["M", "MV", "MOVE"]
-
-    def __init__(self, ctrl: str = None):
-        super().__init__(ctrl)
-
-        if self.code not in self.ALIASES or len(self.args) != 2:
-            raise error.Malformed(f"Invalid {self.CONTROL_CODE} control: {ctrl}")
-
-    def get_distance(self) -> int:
-        """
-        Distance of the move operation, in mm.
-        """
-        return int(self.args[0])
-
-    def get_speed(self) -> int:
-        """
-        Speed to move the actuator in mm/s.
-        """
-        return int(self.args[1])
-
-    def __repr__(self):
-        return f"MV {self.get_distance()} mm @ {self.get_speed()} mm/s"
-
-
-class Colour(Control):
-    """
-    Set device colour & brightness.
-
-    COL <colour <!>
-
-    colour - #RRGGBB[XX] or R,G,B[,X]
-    ! - required to commit the change
-    """
-    CONTROL_CODE = "COL"
-    ALIASES = ["C", "COL", "COLOUR", "COLOR"]
-
-    def __init__(self, ctrl: str = None):
-        super().__init__(ctrl)
-
-        if self.code not in self.ALIASES or 1 > len(self.args) > 2:
-            raise error.Malformed(f"Invalid {self.CONTROL_CODE} control: {ctrl}")
-
-        self.colour = ColourCode(self.args[0])
-
-    def __repr__(self):
-        return f"COL {self.colour}"
-
-
-class Fx(Control):
-    """
-    LED FX control.
-
-    FX <colour> <duration> <fx>
-
-    colour - #RRGGBB[XX] or R,G,B[,X]
-    duration - time in milliseconds
-    FX - one of: FADE, SLIDEL, SLIDER, PULSEL, PULSER
-    """
-    CONTROL_CODE = "FX"
-
-    class FX:
-        FADE = "FADE"
-        SLIDE_L = "SLIDEL"
-        SLIDE_R = "SLIDER"
-        PULSE_L = "PULSEL"
-        PULSE_R = "PULSER"
-
-    def __init__(self, ctrl: str = None):
-        super().__init__(ctrl)
-
-        if len(self.args) != 3:
-            raise error.Malformed(f"Invalid {self.CONTROL_CODE} control: {ctrl}")
-
-        self.colour = ColourCode(self.args[0])
-
-    def get_duration(self) -> int:
-        """
-        Get the duration value in milliseconds.
-        """
-        return int(self.args[1])
-
-    def get_fx(self) -> str:
-        """
-        Get the FX value.
-        """
-        fx = self.args[2].upper().strip()
-        if fx not in [self.FX.FADE, self.FX.SLIDE_L, self.FX.SLIDE_R, self.FX.PULSE_L, self.FX.PULSE_R]:
-            return self.FX.FADE
-        else:
-            return fx
-
-    def __repr__(self):
-        return f"FX {self.colour} -> {self.get_fx()}"
-
+from .control import Control
+from .control.common import Select, Wait, Trigger
+from .control.actuator import Move
+from .control.lights import Colour, Fx
 
 CONTROL_MAP = {
     """
@@ -232,7 +23,8 @@ CONTROL_MAP = {
     "M": Move,
     "MV": Move,
     "MOVE": Move,
-    "C": Colour,
+    "TRG": Trigger,
+    "TRIGGER": Trigger,
     "COL": Colour,
     "COLOUR": Colour,
     "COLOR": Colour,
@@ -378,13 +170,21 @@ class Robotics:
                     # Important: we need to remember the last select for reversing
                     int_chain.append(last_sel)
 
-            # Non-tangible codes -
+            # Common controls
             if isinstance(ctrl, Select):
+                # Select device
                 self.select_device(ctrl)
                 last_sel = ctrl
             elif isinstance(ctrl, Wait):
+                # Wait for a given time
                 await asyncio.sleep(ctrl.get_time() / 1000)
+            elif isinstance(ctrl, Trigger):
+                # Dispatch a trigger message
+                await self.inu.command(const.Subjects.COMMAND_TRIGGER, {
+                    'code': ctrl.get_code(),
+                })
             elif ctrl is None:
+                # Error
                 await self.inu.log("Null control code provided", LogLevel.WARNING)
             else:
                 # Tangible codes need to be sent to the active RoboticsDevice
@@ -394,7 +194,6 @@ class Robotics:
                 await self.devices[self.active_device].execute(ctrl)
 
             if self.interrupted:
-                print("int")
                 # Run the int_chain in reverse order..
                 self.reset_state()
                 await self.inu.log("Reversing ops..", LogLevel.DEBUG)
