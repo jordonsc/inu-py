@@ -169,7 +169,11 @@ class RoboticsApp(SwitchManager):
             return
 
         if not self.inu.state.can_act():
-            self.logger.info(f"Ignoring trigger: {self.inu.state}")
+            if self.inu.settings.trigger_int and self.inu.state.can_act(allow_active=True) and 0 >= code < 6:
+                await self.inu.log(f"Interrupting on trigger code {code} during active sequence")
+                await self.on_interrupt()
+            else:
+                self.logger.info(f"Ignoring trigger: {self.inu.state}")
             return
 
         # Actionable sequence codes range from seq_0 to seq_5

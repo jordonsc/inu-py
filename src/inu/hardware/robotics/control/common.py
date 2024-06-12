@@ -40,6 +40,8 @@ class Select(Control):
 class Wait(Control):
     """
     Delay by a given time in milliseconds.
+
+    The time can also be specified in seconds (s), minutes (m) or hours (h) by using the respective suffix.
     """
     CONTROL_CODE = "WAIT"
     ALIASES = ["W", "WAIT"]
@@ -50,11 +52,23 @@ class Wait(Control):
         if self.code not in self.ALIASES or len(self.args) != 1:
             raise error.Malformed(f"Invalid {self.CONTROL_CODE} control: {ctrl}")
 
+        self.time = 0
+        spec = self.args[0].upper().strip()
+
+        if spec.endswith("S"):
+            self.time = int(spec[:-1]) * 1000
+        elif spec.endswith("M"):
+            self.time = int(spec[:-1]) * 60 * 1000
+        elif spec.endswith("H"):
+            self.time = int(spec[:-1]) * 60 * 60 * 1000
+        else:
+            self.time = int(spec)
+
     def get_time(self) -> int:
         """
         Wait time as an integer in milliseconds.
         """
-        return int(self.args[0])
+        return self.time
 
     def __repr__(self):
         return f"WAIT {self.get_time()}"

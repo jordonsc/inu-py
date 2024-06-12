@@ -1,5 +1,13 @@
 Change Log
 ==========
+### Build 43
+* Added `Capacitive` app for touch/water sensors
+* Added `Light` for ambient light sensors
+* Added `APA102` LED controller to robotics
+* Robotics can now optionally accept triggers as interrupts
+* Robotics `WAIT` command can now accept a time specifier: `WAIT 5s`
+  * Allowed time specifiers: `s` (seconds), `m` (minutes), `h` (hours)
+
 ### Build 42
 * Added `SwitchManager`, allowing other apps to include the Switch app logic
 * Robotics now inherits `SwitchManager`

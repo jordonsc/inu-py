@@ -1,4 +1,4 @@
-INU_BUILD = 42
+INU_BUILD = 43
 
 
 class LogLevel:

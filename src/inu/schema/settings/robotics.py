@@ -26,6 +26,9 @@ class Robotics(Settings, ActionDevice, CooldownDevice):
     cal_seq: str = ""
     cal_seq_hint: str = "Calibration sequence when first initialising"
 
+    trigger_int: bool = False
+    trigger_int_hint: str = "Triggers during a sequence will count as an interrupt"
+
     idle_power: bool = True
     idle_power_hint: str = "Keep devices powered when robotics is idle"
 
