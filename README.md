@@ -112,3 +112,31 @@ Integration tests require a NATS server running locally.
 
     ./test
 
+Quick Start
+===========
+Prepare your local env and NATS server:
+
+    # Install requirements
+    pip install -r requirements.txt
+
+    # Bootstrap your NATS server
+    ./inu bootstrap
+
+    # Start an Inu Network monitor
+    ./inu monitor -lacs
+
+For a TinyS3 device, you can use the following commands to get started:
+
+    # Configure the device settings on the NATS server
+    ./inu settings xxx.yyy
+
+    # Install MicroPython on the TinyS3
+    # [[ Hold BOOT button, press RESET, release BOOT ]]
+    esptool.py --chip esp32s3 --port /dev/ttyACM0 erase_flash
+    esptool.py --chip esp32s3 --port /dev/ttyACM0 write_flash -z 0x0 build/UM_TINYS3.bin
+    # [[ Press RESET to continue to normal operation where we can also install the application itself ]]
+
+    # Install the application on the TinyS3
+    ./inu build xxx.yyy && mpremote
+  
+    # When mpremote connects, press CTRL+B followed by CTRL+D to reboot the device

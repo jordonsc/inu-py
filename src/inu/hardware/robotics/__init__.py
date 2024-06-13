@@ -177,12 +177,17 @@ class Robotics:
                 last_sel = ctrl
             elif isinstance(ctrl, Wait):
                 # Wait for a given time
-                await asyncio.sleep(ctrl.get_time() / 1000)
+                start_time = time.time_ns()
+                while time.time_ns() - start_time < ctrl.get_time() * 1_000_000:
+                    if self.interrupted:
+                        break
+                    await asyncio.sleep(0.1)
             elif isinstance(ctrl, Trigger):
                 # Dispatch a trigger message
                 await self.inu.command(const.Subjects.COMMAND_TRIGGER, {
                     'code': ctrl.get_code(),
                 })
+                await asyncio.sleep(0.1)
             elif ctrl is None:
                 # Error
                 await self.inu.log("Null control code provided", LogLevel.WARNING)

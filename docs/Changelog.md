@@ -1,5 +1,8 @@
 Change Log
 ==========
+### Build 44
+* Robotics `WAIT` command can now be interrupted
+
 ### Build 43
 * Added `Capacitive` app for touch/water sensors
 * Added `Light` for ambient light sensors
