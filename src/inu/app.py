@@ -188,6 +188,10 @@ class InuApp(InuHandler):
         """
         if code == const.TriggerCode.INTERRUPT:
             await self.on_interrupt()
+        elif code == const.TriggerCode.WAIT:
+            await self.on_wait()
+        elif code == const.TriggerCode.BREAK:
+            await self.on_break()
         elif code == const.TriggerCode.RESET_ACTIVE:
             await self.inu.log(f"Indiscriminately resetting active state by user request", LogLevel.WARNING)
             await self.inu.status(active=False, status="")
@@ -326,7 +330,19 @@ class InuApp(InuHandler):
 
     async def on_interrupt(self):
         """
-        A listen-device has published an interrupt code.
+        A listen-device has published an interrupt (100) code.
+        """
+        pass
+
+    async def on_wait(self):
+        """
+        A listen-device has published an wait (103) code.
+        """
+        pass
+
+    async def on_break(self):
+        """
+        A listen-device has published a break (104) code.
         """
         pass
 

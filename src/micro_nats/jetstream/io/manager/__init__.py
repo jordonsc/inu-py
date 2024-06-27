@@ -20,7 +20,7 @@ class JetstreamManager:
         self.logger = logging.getLogger('mnats.js.mgr')
         self.pool = asynchronous.TaskPool()
 
-        self.io_timeout: float = 3
+        self.io_timeout: float = 30
 
     def ensure_connected(self):
         if not self.client.is_connected():
@@ -29,7 +29,7 @@ class JetstreamManager:
     def ensure_connected_and_ackable(self, msg: Message):
         self.ensure_connected()
         if not msg.can_ack():
-            raise js_error.NotAckable()
+            raise js_error.NotAckable(str(msg))
 
     async def request(self, api: str, payload: bytes | str = b'', timeout: float = 5) -> Message:
         """
@@ -49,20 +49,18 @@ class JetstreamManager:
             while not future.done():
                 await asyncio.sleep(0.001)
                 if timeout and (time.time() - start_time >= timeout):
-                    raise error.NetworkTimeout("Timeout waiting for reply")
+                    raise error.NetworkTimeout(f"Timeout waiting for reply ({timeout} seconds)")
 
             msg: Message = future.result
 
             if msg.status_code() == 404:
                 raise error.NotSupported("No messages")
             elif msg.status_code() == 408:
-                raise error.NetworkTimeout("Request timeout")
+                raise error.NetworkTimeout("Request timeout (408)")
             elif msg.status_code() >= 400:
                 raise error.RequestRefused(msg.status_description())
 
             return msg
-        except Exception as e:
-            raise error.MicroNatsError(e)
         finally:
             await self.inbox_mgr.free_inbox(inbox)
 

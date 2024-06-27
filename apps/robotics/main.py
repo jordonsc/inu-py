@@ -169,9 +169,9 @@ class RoboticsApp(SwitchManager):
             return
 
         if not self.inu.state.can_act():
-            if self.inu.settings.trigger_int and self.inu.state.can_act(allow_active=True) and 0 >= code < 6:
-                await self.inu.log(f"Interrupting on trigger code {code} during active sequence")
-                await self.on_interrupt()
+            if self.inu.settings.trigger_wait and self.inu.state.can_act(allow_active=True) and 0 >= code < 6:
+                await self.inu.log(f"WAIT on trigger code {code} during active sequence")
+                await self.on_wait()
             else:
                 self.logger.info(f"Ignoring trigger: {self.inu.state}")
             return
@@ -222,13 +222,33 @@ class RoboticsApp(SwitchManager):
 
     async def on_interrupt(self):
         """
-        A listen-device has published an interrupt code.
+        A listen-device has published an interrupt code (100).
         """
         if self.inu.state.active:
-            if self.robotics.interrupt():
+            if self.robotics.req_int():
                 self.logger.info("Interrupting operation")
             else:
                 self.logger.info("Cannot interrupt")
+
+    async def on_wait(self):
+        """
+        A listen-device has published a wait code (103).
+        """
+        if self.inu.state.active:
+            if self.robotics.req_wait():
+                self.logger.info("WAIT-reset")
+            else:
+                self.logger.info("Cannot reset WAIT")
+
+    async def on_break(self):
+        """
+        A listen-device has published a break code (104).
+        """
+        if self.inu.state.active:
+            if self.robotics.req_break():
+                self.logger.info("WAIT-break")
+            else:
+                self.logger.info("Cannot break from WAIT")
 
     async def on_enabled_changed(self, enabled: bool):
         """

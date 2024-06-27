@@ -1,4 +1,4 @@
-INU_BUILD = 44
+INU_BUILD = 45
 
 
 class LogLevel:
@@ -149,9 +149,16 @@ class Streams:
 
 
 class TriggerCode:
+    # [Robotics] Robotics interrupt - roll-back and restart
     INTERRUPT = 100
+    # [Robotics] Request device recalibrate (must NOT be enabled)
     CALIBRATE = 101
+    # Force-clear active state (repair lingering error without restarting)
     RESET_ACTIVE = 102
+    # [Robotics] Similar to INTERRUPT, but will only reset the timer on an active WAIT command
+    WAIT = 103
+    # [Robotics] Will immediately drop out of an active WAIT command
+    BREAK = 104
 
     ENABLE_TOGGLE = 110
     ENABLE_ON = 111

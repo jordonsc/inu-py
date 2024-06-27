@@ -39,6 +39,8 @@ class RoboticsDevice:
 
     def __init__(self, inu=None, log_path="inu.robotics"):
         self.interrupted = False
+        self.int_wait = False
+        self.int_break = False
         self.inu = inu
         self.logger = logging.getLogger(log_path)
 
@@ -56,11 +58,23 @@ class RoboticsDevice:
         """
         pass
 
-    def interrupt(self):
+    def req_int(self):
         """
         Inform an active operation that it has been interrupted, expecting it to reverse action already taken and abort.
         """
         self.interrupted = True
+
+    def req_wait(self):
+        """
+        Inform the current/next WAIT command to reset the timer.
+        """
+        self.int_wait = True
+
+    def req_break(self):
+        """
+        Inform the current/next WAIT command to immediately break out of the delay.
+        """
+        self.int_break = True
 
     def select_component(self, component_id):
         """
@@ -105,8 +119,10 @@ class Robotics:
         # Currently selected device (eg "A0")
         self.active_device = None
 
-        # If the current operation has been interrupted
+        # If the current operation has a request to interrupt, wait or break
         self.interrupted = False
+        self.int_wait = False
+        self.int_break = False
 
         # If the current operation _allows_ interruption
         self.allow_interrupt = False
@@ -180,6 +196,15 @@ class Robotics:
                 start_time = time.time_ns()
                 while time.time_ns() - start_time < ctrl.get_time() * 1_000_000:
                     if self.interrupted:
+                        # Interrupted, drop out so the INT process can begin
+                        break
+                    if self.int_wait:
+                        # WAIT-reset requested, restart timer
+                        start_time = time.time_ns()
+                        self.int_wait = False
+                    if self.int_break:
+                        # WAIT-break requested, immediately drop out of WAIT delay
+                        self.int_break = False
                         break
                     await asyncio.sleep(0.1)
             elif isinstance(ctrl, Trigger):
@@ -225,6 +250,8 @@ class Robotics:
         """
         self.active_device = None
         self.interrupted = False
+        self.int_wait = False
+        self.int_break = False
         self.allow_interrupt = False
         self.idle_time = time.time()
 
@@ -275,7 +302,7 @@ class Robotics:
 
         return int_list
 
-    def interrupt(self) -> bool:
+    def req_int(self) -> bool:
         """
         Interrupt the current operation, halting and reversing.
 
@@ -283,7 +310,33 @@ class Robotics:
         """
         if self.active_device and self.allow_interrupt:
             self.interrupted = True
-            self.devices[self.active_device].interrupt()
+            self.devices[self.active_device].req_int()
+            return True
+        else:
+            return False
+
+    def req_wait(self) -> bool:
+        """
+        Reset the current WAIT timer.
+
+        Returns True if the wait was accepted.
+        """
+        if self.active_device:
+            self.int_wait = True
+            self.devices[self.active_device].req_wait()
+            return True
+        else:
+            return False
+
+    def req_break(self) -> bool:
+        """
+        Reset the current WAIT timer.
+
+        Returns True if the wait was accepted.
+        """
+        if self.active_device:
+            self.int_break = True
+            self.devices[self.active_device].req_break()
             return True
         else:
             return False
