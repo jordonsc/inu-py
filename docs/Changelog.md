@@ -1,5 +1,8 @@
 Change Log
 ==========
+### Build 46
+* 
+
 ### Build 45
 * Added "WAIT" (103) and "BREAK" (104) trigger codes to reset or break the WAIT command timer
 * Increased NATS default connection timeout to 30 seconds which was causing issues with subscriptions at low values

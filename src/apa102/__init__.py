@@ -145,7 +145,8 @@ class Apa102:
 
         # Perform the fade
         start_time = time.time_ns()
-        duration_ns = duration * 1000000
+        duration_ns = duration * 1_000_000
+        ticks = 0
         while time.time_ns() < start_time + duration_ns:
             # Calculate the new color
             delta = (time.time_ns() - start_time) / duration_ns
@@ -160,6 +161,11 @@ class Apa102:
 
             # Write the new colors to the strip
             self.write()
+            ticks += 1
+
+        #total_time = (time.time_ns() - start_time) * 10 ** -9
+        #fps = ticks / total_time
+        #print(f"Total time: {total_time}, ticks: {ticks}, FPS: {fps}")
 
         self.fill(col, write=True)
 
@@ -173,7 +179,7 @@ class Apa102:
         :return:
         """
         start_time = time.time_ns()
-        duration_ns = duration * 1000000
+        duration_ns = duration * 1_000_000
         while time.time_ns() < start_time + duration_ns:
             pos = (time.time_ns() - start_time) / duration_ns
 
@@ -204,7 +210,7 @@ class Apa102:
         :return:
         """
         start_time = time.time_ns()
-        duration_ns = duration * 1000000
+        duration_ns = duration * 1_000_000
         duration_exp = duration_ns * size  # How much we need to extend the position calcs to account for feathering
         base_col = self.current_colour[self.selected_segment]
         r, g, b, x = col.unpack()

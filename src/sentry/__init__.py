@@ -40,7 +40,7 @@ class Device:
 
 
 class Sentry(InuHandler):
-    MISSED_HEARTBEATS_ALARM = 5
+    MISSED_HEARTBEATS_ALARM = 10
     DEFAULT_PRIORITY = 3
 
     def __init__(self, args: argparse.Namespace):
