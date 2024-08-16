@@ -1,7 +1,9 @@
-textual
+textual~=0.41.0
 esptool
-mpremote
-aiohttp
-aiofiles
-gcloud
-requests
+mpremote~=1.21.0
+aiohttp~=3.8.6
+aiofiles~=23.2.1
+gcloud~=0.18.3
+requests~=2.31.0
+homeassistant~=2023.7.3
+voluptuous~=0.13.1

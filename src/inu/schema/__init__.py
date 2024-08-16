@@ -1,8 +1,7 @@
 import json
 import logging
 
-from inu.const import *
-from inu.error import Malformed
+from ..error import Malformed
 
 logger = logging.getLogger('inu.schema')
 

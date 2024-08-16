@@ -1,0 +1,12 @@
+{
+  "domain": "inu",
+  "name": "Inu Framework",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/jordonsc/inu-py",
+  "integration_type": "hub",
+  "iot_class": "local_push",
+  "requirements": ["micro-nats", "inu-net"],
+  "version": "0.1.0"
+}
