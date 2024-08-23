@@ -94,7 +94,7 @@ class InuStateSensor(BinarySensorEntity):
         return DeviceInfo(
             identifiers={("inu", self.device.device_id)},
             name=self.device.device_id,
-            manufacturer="Inu",
+            manufacturer="Local IP",
             model=self.device.device_id.split(".")[0],
             sw_version=INU_BUILD,
         )
