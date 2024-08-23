@@ -1,4 +1,4 @@
-INU_BUILD = 46
+INU_BUILD = 47
 
 
 class LogLevel:
@@ -40,6 +40,7 @@ class DeviceType:
     MOTION = "motion"
     RANGE = "range"
     LIGHT = "light"
+    RADAR = "radar"
 
     # Motorised actuator or physical pulley, winch, etc
     ROBOTICS = "robotics"

@@ -24,7 +24,7 @@ class VEML6030(AmbientLightSensor):
         self.config = bytearray(2)
         self.set_config(gain)  # Set ALS gain and integration time
 
-    def read(self):
+    def read(self) -> float:
         # Read ALS data from 0x04 register
         data = self.i2c.readfrom_mem(self.I2C_ADDR, 0x04, 2)
         return ((data[0] << 8) | data[1]) * VEML6030.RESOLUTION

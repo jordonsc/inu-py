@@ -1,3 +1,6 @@
 class AmbientLightSensor:
-    def read(self):
+    def read(self) -> float:
+        """
+        Read the current light level.
+        """
         pass

@@ -4,6 +4,7 @@ import logging
 import random
 
 from homeassistant.core import HomeAssistant
+
 from inu_net import Inu, const, InuHandler
 from inu_net.schema import Heartbeat
 from inu_net.schema.status import Status
@@ -158,6 +159,7 @@ class Hub(InuHandler):
         """
         Register a newly-detected Inu device as a Home Assistant entity.
         """
+
         if self.add_sensor_cb is None:
             # reset the device pool so it can be added later
             self.logger.error("Attempted to add a device without an add_sensor_cb")

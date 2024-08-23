@@ -89,6 +89,12 @@ class UART:
         """
         pass
 
+    def flush(self):
+        """
+        Wait for data to be sent.
+        """
+        pass
+
     def readline(self):
         """
         Read a line (terminated by '\n') from the UART.

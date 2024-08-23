@@ -16,7 +16,7 @@ class BH1750(AmbientLightSensor):
         self.config = bytearray(1)
         self.set_config(BH1750.CONFIG.CONTINUOUS_HIGH_RES_MODE)
 
-    def read(self):
+    def read(self) -> float:
         data = self.i2c.readfrom(self.I2C_ADDR, 2)
         return ((data[0] << 8) | data[1]) / 1.2
 

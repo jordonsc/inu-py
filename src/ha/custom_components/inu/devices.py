@@ -1,7 +1,9 @@
 import time
 
 from homeassistant.components.binary_sensor import BinarySensorEntity
+from homeassistant.helpers.entity import DeviceInfo
 from inu_net import Status
+from inu_net.const import INU_BUILD
 
 
 def clean_device_id(device_id: str) -> str:
@@ -64,6 +66,7 @@ class InuStateSensor(BinarySensorEntity):
         self.device = device
         self.entity_id = f"binary_sensor.{clean_device_id(device.device_id)}_{state_field}"
         self._attr_name = f"Inu {device.device_id}: {state_field}"
+        self._attr_unique_id = self.entity_id
 
         if self.state_field == StateField.ACTIVE:
             self._attr_icon = "mdi:bell-ring-outline"
@@ -85,3 +88,13 @@ class InuStateSensor(BinarySensorEntity):
             return self.device.status.locked
         else:
             return False
+
+    @property
+    def device_info(self) -> DeviceInfo | None:
+        return DeviceInfo(
+            identifiers={("inu", self.device.device_id)},
+            name=self.device.device_id,
+            manufacturer="Inu",
+            model=self.device.device_id.split(".")[0],
+            sw_version=INU_BUILD,
+        )

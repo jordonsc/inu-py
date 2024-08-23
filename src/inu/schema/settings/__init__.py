@@ -77,6 +77,8 @@ def get_device_settings_class(dvc: str) -> type:
         return sensors.MotionSensor
     elif dvc == DeviceType.RANGE:
         return sensors.RangeTrigger
+    elif dvc == DeviceType.RADAR:
+        return sensors.RadarSensor
     elif dvc == DeviceType.ROBOTICS:
         return robotics.Robotics
     elif dvc == DeviceType.RELAY:

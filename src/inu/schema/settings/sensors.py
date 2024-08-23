@@ -14,9 +14,33 @@ class MotionSensor(TriggerDevice):
     ## A motion sensor.
     """
     sensitivity: int = 50
-    sensitivity_hint: str = "Sensor trip sensitivity, between 1 (low) and 100 (high)"
+    sensitivity_hint: str = "Sensor trip sensitivity (1-100)"
     sensitivity_min: int = 1
     sensitivity_max: int = 100
+
+
+class RadarSensor(Settings):
+    """
+    ## An mmwave radar sensor.
+
+    Unlike other sensors, the radar sensor is a more advanced sensor that can detect presence, idle or active, along
+    with the speed and direction of an object in front of it.
+
+    Because of its high accuracy, this sensor doesn't have a cooldown, but will accurately detect when a body has
+    left its area of detection.
+    """
+    trigger_code: int = 0
+    trigger_code_hint: str = "`code` to include in the trigger; may correlate to a sequence or special `code`"
+
+    room_size: int = 4
+    room_size_hint: str = "Room size in approx dimensions (1-5)"
+    room_size_min: int = 1
+    room_size_max: int = 5
+
+    sensitivity: int = 2
+    sensitivity_hint: str = "Sensitivity of sensor (1-3)"
+    sensitivity_min: int = 1
+    sensitivity_max: int = 3
 
 
 class RangeTrigger(TriggerDevice):
