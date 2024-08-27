@@ -1,7 +1,10 @@
 Change Log
 ==========
-### Build 46
-* 
+### Build 48
+* Radar devices now have fully configurable settings
+
+### Build 47
+* Added mmwave radar devices
 
 ### Build 45
 * Added "WAIT" (103) and "BREAK" (104) trigger codes to reset or break the WAIT command timer

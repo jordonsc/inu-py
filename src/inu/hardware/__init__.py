@@ -147,3 +147,9 @@ class RadarSensor:
         Returns the current state of the radar sensor.
         """
         return self.radar
+
+    async def calibrate(self, cfg: dict):
+        """
+        Calibrates the radar sensor with the given configuration.
+        """
+        pass

@@ -32,15 +32,8 @@ class RadarSensor(Settings):
     trigger_code: int = 0
     trigger_code_hint: str = "`code` to include in the trigger; may correlate to a sequence or special `code`"
 
-    room_size: int = 4
-    room_size_hint: str = "Room size in approx dimensions (1-5)"
-    room_size_min: int = 1
-    room_size_max: int = 5
-
-    sensitivity: int = 2
-    sensitivity_hint: str = "Sensitivity of sensor (1-3)"
-    sensitivity_min: int = 1
-    sensitivity_max: int = 3
+    template: str = "std"
+    template_hint: str = "Calibration template"
 
 
 class RangeTrigger(TriggerDevice):

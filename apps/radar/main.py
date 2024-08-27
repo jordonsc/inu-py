@@ -2,7 +2,7 @@ import asyncio
 
 from inu import const
 from inu.app import InuApp
-from inu.hardware.mmwave.mr24hpc1 import Mr24hpc1, ControlCodes, Data, Scene, Sensitivity, NoBodyDelay
+from inu.hardware.mmwave.mr24hpc1 import Mr24hpc1
 from inu.schema.settings.sensors import RadarSensor
 from micro_nats.util.asynchronous import TaskPool
 
@@ -62,9 +62,15 @@ class RadarApp(InuApp):
 
     async def set_sensor_calibration(self):
         # Calibrate sensor
-        self.sensor.send_cmd(ControlCodes.SCENE, Scene.from_room_size(self.inu.settings.room_size))
-        self.sensor.send_cmd(ControlCodes.SENSITIVITY, Sensitivity.from_value(self.inu.settings.sensitivity))
-        self.sensor.send_cmd(ControlCodes.NO_PERSON_REPORT, NoBodyDelay.NONE)
+        template = self.inu.settings.template
+        cfg = self.get_config(["radar", "templates", template], None)
+
+        if cfg is None:
+            self.inu.log(f"Radar template '{template}' not in device configuration", level="error")
+            return
+
+        self.logger.info(f"Calibrating radar sensor with template '{template}'")
+        await self.sensor.calibrate(cfg)
 
 
 if __name__ == "__main__":
