@@ -7,3 +7,5 @@ gcloud
 requests
 homeassistant
 voluptuous
+boto3
+botocore

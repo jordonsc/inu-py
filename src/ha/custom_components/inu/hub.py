@@ -3,7 +3,8 @@ from __future__ import annotations
 import logging
 import random
 
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall, callback
+from homeassistant.helpers import device_registry
 
 from inu_net import Inu, const, InuHandler
 from inu_net.schema import Heartbeat
@@ -13,7 +14,7 @@ from micro_nats import error as mn_error, model
 from micro_nats.jetstream.error import ErrorResponseException
 from micro_nats.jetstream.protocol.consumer import Consumer, ConsumerConfig
 from micro_nats.util import Time
-from .devices import Device, InuStateSensor, StateField
+from .devices import Device, InuStateSensor, StateField, InuStateSwitch, InuStateText, InuTriggerButton, clean_device_id
 
 
 class Hub(InuHandler):
@@ -23,7 +24,13 @@ class Hub(InuHandler):
         self.ha = ha
         self.host = host
         self.id = host.lower()
-        self.add_sensor_cb = None
+        self.dr = device_registry.async_get(ha)
+
+        self.add_sensor_callback = None
+        self.add_button_callback = None
+        self.add_text_callback = None
+        self.add_switch_callback = None
+
         self.has_inited = False
 
         self.logger = logging.getLogger('inu.hub')
@@ -43,6 +50,17 @@ class Hub(InuHandler):
     @property
     def hub_id(self) -> str:
         return self.id
+
+    @callback
+    def nats_service(self, call: ServiceCall) -> None:
+        self.ha.async_create_task(self.publish(call.data["subject"], call.data["payload"]))
+
+    async def publish(self, subject: str, payload: str) -> None:
+        """
+        Publish a message to the Inu server.
+        """
+        self.logger.warning(f"NATS publish: subj: {subject}, payload: {payload}")
+        await self.inu.nats.publish(subject, str(payload))
 
     async def test_connection(self) -> bool:
         if not self.has_inited:
@@ -159,17 +177,41 @@ class Hub(InuHandler):
         """
         Register a newly-detected Inu device as a Home Assistant entity.
         """
-
-        if self.add_sensor_cb is None:
+        if (self.add_sensor_callback is None or self.add_text_callback is None or
+                self.add_switch_callback is None or self.add_button_callback is None):
             # reset the device pool so it can be added later
-            self.logger.error("Attempted to add a device without an add_sensor_cb")
+            self.logger.error("Attempted to add a device without appropriate callbacks")
             self.device_pool = {}
             return
 
         self.logger.warning(f"inu: adding device '{device.device_id}'")
 
+        # 'Active' state is a read-only binary sensor
         device.sensor_active = InuStateSensor(device, StateField.ACTIVE)
-        device.sensor_enabled = InuStateSensor(device, StateField.ENABLED)
-        device.sensor_locked = InuStateSensor(device, StateField.LOCKED)
 
-        self.add_sensor_cb([device.sensor_active, device.sensor_enabled, device.sensor_locked])
+        self.add_sensor_callback([
+            device.sensor_active,
+        ])
+
+        # 'Enabled' and 'Locked' states are read-write switches
+        device.sensor_enabled = InuStateSwitch(device, self.inu, StateField.ENABLED)
+        device.sensor_locked = InuStateSwitch(device, self.inu, StateField.LOCKED)
+
+        self.add_switch_callback([
+            device.sensor_enabled,
+            device.sensor_locked,
+        ])
+
+        # 'Status' is a read-only text sensor
+        device.sensor_status = InuStateText(device)
+
+        self.add_text_callback([
+            device.sensor_status,
+        ])
+
+        # Trigger button sends a TRG with code 0 to the device's central address
+        device.trigger_button = InuTriggerButton(device, self.inu)
+
+        self.add_button_callback([
+            device.trigger_button,
+        ])

@@ -21,11 +21,10 @@ import logging
 
 # HA domain & platforms
 DOMAIN = "inu"
-PLATFORMS = [Platform.SENSOR]
+PLATFORMS = [Platform.SENSOR, Platform.SWITCH, Platform.TEXT, Platform.BUTTON]
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    logging.warning("inu: legacy setup")
     hass.states.async_set('inu.build', const.INU_BUILD)
     return True
 
@@ -34,9 +33,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     logging.warning("inu: begin setup on host {}".format(entry.data["host"]))
     inu_hub = hub.Hub(hass, entry.data["host"])
     await inu_hub.inu.init()
-    logging.warning("inu: init completed")
+
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = inu_hub
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    hass.services.async_register(DOMAIN, "nats_publish", inu_hub.nats_service)
     return True
 
 

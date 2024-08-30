@@ -1,0 +1,12 @@
+nats_publish:
+  fields:
+    subject:
+      name: "Subject"
+      description: "The subject to publish the message to."
+      required: true
+      example: "some.device"
+    payload:
+      name: "Payload"
+      description: "JSON formatted payload to publish."
+      required: true
+      example: "{\"key\": \"value\"}"

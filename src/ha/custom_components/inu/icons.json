@@ -1,0 +1,5 @@
+{
+  "services": {
+    "nats_publish": {"service": "mdi:cube-send"}
+  }
+}
