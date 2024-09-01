@@ -187,17 +187,19 @@ class Hub(InuHandler):
         self.logger.warning(f"inu: adding device '{device.device_id}'")
 
         # 'Active' state is a read-only binary sensor
-        device.sensor_active = InuStateSensor(device, StateField.ACTIVE)
-
-        self.add_sensor_callback([
-            device.sensor_active,
-        ])
+        # device.sensor_active = InuStateSensor(device, StateField.ACTIVE)
+        #
+        # self.add_sensor_callback([
+        #     device.sensor_active,
+        # ])
 
         # 'Enabled' and 'Locked' states are read-write switches
+        device.sensor_active = InuStateSwitch(device, self.inu, StateField.ACTIVE)
         device.sensor_enabled = InuStateSwitch(device, self.inu, StateField.ENABLED)
         device.sensor_locked = InuStateSwitch(device, self.inu, StateField.LOCKED)
 
         self.add_switch_callback([
+            device.sensor_active,
             device.sensor_enabled,
             device.sensor_locked,
         ])
