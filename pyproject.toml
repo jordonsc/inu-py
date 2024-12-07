@@ -1,5 +1,5 @@
 [project]
-name = "inu_net"
+name = "inu"
 version = "1.0.0"
 readme = "README.md"
 authors = [
@@ -26,7 +26,4 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-py-modules = ['inu_net']
-
-[tool.setuptools.package-data]
-inu_net = ['src/inu/*']
+package-dir = {"" = "src"}

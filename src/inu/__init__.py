@@ -11,7 +11,7 @@ from micro_nats.jetstream.protocol import consumer
 from micro_nats.util import Time
 from micro_nats.util.asynchronous import TaskPool
 
-from . import error, const, schema
+from . import error, const
 from .schema import Heartbeat
 from .schema.settings import Settings
 from .schema.status import Status

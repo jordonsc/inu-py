@@ -2,10 +2,10 @@
 Inu Framework custom component.
 
 ## Configuration
-To use this component you will need to add the following to your `configuration.yaml` file:
+To use this component you will need to add a hub using the HA UI. When prompted, enter your Inu network's NATS server:
 
-    inu:
-        host: nats://<ipaddress>:4222
+    nats://<ipaddress>:4222
+
 """
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.typing import ConfigType
-from inu_net import const
+from inu import const
 
 from . import hub
 

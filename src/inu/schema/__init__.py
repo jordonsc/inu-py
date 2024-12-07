@@ -1,8 +1,6 @@
 import json
 import logging
 
-from ..error import Malformed
-
 logger = logging.getLogger('inu.schema')
 
 
@@ -17,6 +15,7 @@ class Schema:
         elif isinstance(bootstrap, dict):
             self.hydrate_dict(bootstrap)
         else:
+            from ..error import Malformed
             raise Malformed(f"Invalid type for schema bootstrap: {type(bootstrap)}: {bootstrap}")
 
         if len(kwargs) > 0:
@@ -86,6 +85,8 @@ class Log(Schema):
     message: str = None
 
     def _validate(self):
+        from ..error import Malformed
+
         if self.level is None:
             raise Malformed("Log level cannot be None")
 
@@ -101,6 +102,8 @@ class Alert(Schema):
     message: str = None
 
     def _validate(self):
+        from ..error import Malformed
+
         if self.priority is None:
             raise Malformed("Priority cannot be None")
 
