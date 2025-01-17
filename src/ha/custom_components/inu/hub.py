@@ -181,6 +181,11 @@ class Hub(InuHandler):
                 self.add_switch_callback is None or self.add_button_callback is None):
             # reset the device pool so it can be added later
             self.logger.error("Attempted to add a device without appropriate callbacks")
+            self.logger.error(f" - binary_sensor: {"No" if self.add_sensor_callback is None else "Yes"}")
+            self.logger.error(f" - text:          {"No" if self.add_sensor_callback is None else "Yes"}")
+            self.logger.error(f" - switch:        {"No" if self.add_sensor_callback is None else "Yes"}")
+            self.logger.error(f" - button:        {"No" if self.add_sensor_callback is None else "Yes"}")
+
             self.device_pool = {}
             return
 
