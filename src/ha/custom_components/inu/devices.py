@@ -32,7 +32,6 @@ class Device:
         self.status.active = False
 
         self.binary_sensor_active = None
-        self.sensor_active = None
         self.sensor_enabled = None
         self.sensor_locked = None
         self.sensor_status = None
@@ -54,11 +53,11 @@ class Device:
         self.last_heartbeat = time.monotonic()
 
     def update_ha(self):
+        if self.binary_sensor_active is not None:
+            self.binary_sensor_active.schedule_update_ha_state()
+
         if self.sensor_enabled is not None:
             self.sensor_enabled.schedule_update_ha_state()
-
-        if self.sensor_active is not None:
-            self.sensor_active.schedule_update_ha_state()
 
         if self.sensor_locked is not None:
             self.sensor_locked.schedule_update_ha_state()
