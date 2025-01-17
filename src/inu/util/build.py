@@ -40,7 +40,7 @@ class File:
 class Build(Utility):
     # Github repo details for the MicroPython library
     LIB_REPO = "micropython/micropython-lib"
-    LIB_TAG = "v1.21.0"
+    LIB_TAG = "v1.24.1"
 
     # Github archive structure
     GIT_PATH = "https://github.com/{lib}/archive/refs/tags/{tag}{ext}"

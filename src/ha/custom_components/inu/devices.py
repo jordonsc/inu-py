@@ -3,7 +3,6 @@ import time
 
 from homeassistant.components.binary_sensor import BinarySensorEntity, BinarySensorDeviceClass
 from homeassistant.components.button import ButtonEntity
-from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.components.text import TextEntity
 from homeassistant.helpers.entity import DeviceInfo
@@ -32,6 +31,7 @@ class Device:
         self.status.locked = False
         self.status.active = False
 
+        self.binary_sensor_active = None
         self.sensor_active = None
         self.sensor_enabled = None
         self.sensor_locked = None
@@ -93,59 +93,24 @@ class InuEntity:
         )
 
 
-class InuStateSensor(InuEntity, SensorEntity):
+class InuStateSensor(InuEntity, BinarySensorEntity):
     def __init__(self, device: Device, state_field: str):
         super().__init__(device)
         self.state_field = state_field
-        self.entity_id = f"sensor.{clean_device_id(device.device_id)}_{state_field}"
+        self.entity_id = f"binary_sensor.{clean_device_id(device.device_id)}_{state_field}"
         self._attr_name = f"Inu {device.device_id}: {state_field}"
-        self._attr_device_class = SensorDeviceClass.ENUM
-
         device_type = self.device.device_id.split(".")[0]
-        is_motion = False
 
-        if device_type == "radar":
-            is_motion = True
-            self._attr_options = [
-                'Present',
-                'Vacant'
-            ]
-        elif device_type == "motion" or device_type == "range":
-            is_motion = True
-            self._attr_options = [
-                'Motion Detected',
-                'Clear'
-            ]
+        if device_type == "radar" or device_type == "motion" or device_type == "range":
+            self._attr_device_class = BinarySensorDeviceClass.MOTION
+            self._attr_icon = "mdi:motion-sensor"
         else:
-            self._attr_options = [
-                'On',
-                'Off'
-            ]
-
-        if self.state_field == StateField.ACTIVE:
-            if is_motion:
-                self._attr_icon = "mdi:motion-sensor"
-            else:
-                self._attr_icon = "mdi:bell-ring-outline"
-        elif self.state_field == StateField.ENABLED:
+            self._attr_device_class = BinarySensorDeviceClass.RUNNING
             self._attr_icon = "mdi:check-circle-outline"
-        elif self.state_field == StateField.LOCKED:
-            self._attr_icon = "mdi:lock-outline"
-
-    def get_opt(self, value: bool) -> str:
-        return self._attr_options[0 if value else 1]
 
     @property
-    def native_value(self) -> str:
-        if self.state_field == StateField.ACTIVE:
-            return self.get_opt(self.device.status.active)
-        elif self.state_field == StateField.ENABLED:
-            return self.get_opt(self.device.status.enabled)
-        elif self.state_field == StateField.LOCKED:
-            return self.get_opt(self.device.status.locked)
-        else:
-            return "Unknown"
-
+    def is_on(self) -> bool | None:
+        return self.device.status.active
 
 class InuStateSwitch(InuEntity, SwitchEntity):
     def __init__(self, device: Device, inu: Inu, state_field: str):

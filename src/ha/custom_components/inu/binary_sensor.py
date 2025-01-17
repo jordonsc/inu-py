@@ -14,4 +14,4 @@ async def async_setup_entry(
 ) -> None:
     hub = hass.data[DOMAIN][config_entry.entry_id]
     hub.add_sensor_callback = async_add_entities
-    logging.warning(f"inu: sensor setup for {hub.host}")
+    logging.warning(f"inu: binary_sensor setup for {hub.host}")

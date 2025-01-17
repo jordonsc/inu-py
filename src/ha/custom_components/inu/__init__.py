@@ -21,10 +21,10 @@ import logging
 
 # HA domain & platforms
 DOMAIN = "inu"
-PLATFORMS = [Platform.SENSOR, Platform.SWITCH, Platform.TEXT, Platform.BUTTON]
+PLATFORMS = [Platform.SENSOR, Platform.SWITCH, Platform.TEXT, Platform.BUTTON, Platform.BINARY_SENSOR]
 
 
-async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+async def async_setup(hass: HomeAssistant, _: ConfigType) -> bool:
     hass.states.async_set('inu.build', const.INU_BUILD)
     return True
 
