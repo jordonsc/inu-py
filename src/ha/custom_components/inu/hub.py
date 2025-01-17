@@ -185,7 +185,6 @@ class Hub(InuHandler):
             self.logger.error(f" - text:          {"No" if self.add_sensor_callback is None else "Yes"}")
             self.logger.error(f" - switch:        {"No" if self.add_sensor_callback is None else "Yes"}")
             self.logger.error(f" - button:        {"No" if self.add_sensor_callback is None else "Yes"}")
-
             self.device_pool = {}
             return
 
@@ -199,12 +198,10 @@ class Hub(InuHandler):
         ])
 
         # 'Enabled' and 'Locked' states are read-write switches
-        device.sensor_active = InuStateSwitch(device, self.inu, StateField.ACTIVE)
         device.sensor_enabled = InuStateSwitch(device, self.inu, StateField.ENABLED)
         device.sensor_locked = InuStateSwitch(device, self.inu, StateField.LOCKED)
 
         self.add_switch_callback([
-            device.sensor_active,
             device.sensor_enabled,
             device.sensor_locked,
         ])
