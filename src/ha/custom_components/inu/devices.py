@@ -35,6 +35,7 @@ class Device:
         self.sensor_enabled = None
         self.sensor_locked = None
         self.sensor_status = None
+        self.active_switch = None
         self.trigger_button = None
 
     def has_expired(self, missed=5) -> bool:
@@ -103,6 +104,12 @@ class InuStateSensor(InuEntity, BinarySensorEntity):
         if device_type == "radar" or device_type == "motion" or device_type == "range":
             self._attr_device_class = BinarySensorDeviceClass.MOTION
             self._attr_icon = "mdi:motion-sensor"
+        elif device_type == "relay":
+            self._attr_device_class = BinarySensorDeviceClass.POWER
+            self._attr_icon = "mdi:power"
+        elif device_type == "switch":
+            self._attr_device_class = BinarySensorDeviceClass.RUNNING
+            self._attr_icon = "mdi:toggle-switch"
         else:
             self._attr_device_class = BinarySensorDeviceClass.RUNNING
             self._attr_icon = "mdi:check-circle-outline"
@@ -119,7 +126,7 @@ class InuStateSwitch(InuEntity, SwitchEntity):
         self._attr_name = f"Inu {device.device_id}: {state_field}"
 
         if self.state_field == StateField.ACTIVE:
-            self._attr_icon = "mdi:bell-ring-outline"
+            self._attr_icon = "mdi:toggle-switch"
         elif self.state_field == StateField.ENABLED:
             self._attr_icon = "mdi:check-circle-outline"
         elif self.state_field == StateField.LOCKED:
@@ -139,7 +146,9 @@ class InuStateSwitch(InuEntity, SwitchEntity):
     async def async_turn_on(self, **kwargs) -> None:
         """Turn the entity on."""
         code = 0
-        if self.state_field == StateField.ENABLED:
+        if self.state_field == StateField.ACTIVE:
+            code = const.TriggerCode.RELAY_ON
+        elif self.state_field == StateField.ENABLED:
             code = const.TriggerCode.ENABLE_ON
         elif self.state_field == StateField.LOCKED:
             code = const.TriggerCode.LOCK_ON
@@ -150,7 +159,7 @@ class InuStateSwitch(InuEntity, SwitchEntity):
         """Turn the entity off."""
         code = 0
         if self.state_field == StateField.ACTIVE:
-            code = const.TriggerCode.BREAK
+            code = const.TriggerCode.RELAY_OFF
         elif self.state_field == StateField.ENABLED:
             code = const.TriggerCode.ENABLE_OFF
         elif self.state_field == StateField.LOCKED:

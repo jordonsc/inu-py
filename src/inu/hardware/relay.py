@@ -19,6 +19,7 @@ class Relay:
 
     async def on(self):
         self.pin.on()
+        self.active = True
         self.logger.debug(f"Relay:{self.pin} ACTIVE")
 
         if self.state_cb:
@@ -26,6 +27,7 @@ class Relay:
 
     async def off(self):
         self.pin.off()
+        self.active = False
         self.logger.debug(f"Relay:{self.pin} INACTIVE")
 
         if self.state_cb:

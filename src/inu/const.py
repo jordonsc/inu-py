@@ -150,6 +150,11 @@ class Streams:
 
 
 class TriggerCode:
+    # Relay controls
+    RELAY_TOGGLE = 0
+    RELAY_ON = 1
+    RELAY_OFF = 2    
+
     # [Robotics] Robotics interrupt - roll-back and restart
     INTERRUPT = 100
     # [Robotics] Request device recalibrate (must NOT be enabled)

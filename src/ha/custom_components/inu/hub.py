@@ -182,9 +182,9 @@ class Hub(InuHandler):
             # reset the device pool so it can be added later
             self.logger.error("Attempted to add a device without appropriate callbacks")
             self.logger.error(f" - binary_sensor: {"No" if self.add_sensor_callback is None else "Yes"}")
-            self.logger.error(f" - text:          {"No" if self.add_sensor_callback is None else "Yes"}")
-            self.logger.error(f" - switch:        {"No" if self.add_sensor_callback is None else "Yes"}")
-            self.logger.error(f" - button:        {"No" if self.add_sensor_callback is None else "Yes"}")
+            self.logger.error(f" - text:          {"No" if self.add_text_callback is None else "Yes"}")
+            self.logger.error(f" - switch:        {"No" if self.add_switch_callback is None else "Yes"}")
+            self.logger.error(f" - button:        {"No" if self.add_button_callback is None else "Yes"}")
             self.device_pool = {}
             return
 
@@ -205,6 +205,15 @@ class Hub(InuHandler):
             device.sensor_enabled,
             device.sensor_locked,
         ])
+
+        # For relays, we can also add the 'Active' state as a switch
+        if device.device_id.startswith("relay."): 
+            device.active_switch = InuStateSwitch(device, self.inu, StateField.ACTIVE)
+
+            self.add_switch_callback([
+                device.active_switch,
+            ])
+
 
         # 'Status' is a read-only text sensor
         device.sensor_status = InuStateText(device)
