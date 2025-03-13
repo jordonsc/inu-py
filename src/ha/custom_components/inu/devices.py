@@ -66,6 +66,9 @@ class Device:
         if self.sensor_status is not None:
             self.sensor_status.schedule_update_ha_state()
 
+        if self.active_switch is not None:
+            self.active_switch.schedule_update_ha_state()
+
 
 class StateField:
     ACTIVE = "active"
