@@ -147,7 +147,7 @@ class InuStateSwitch(InuEntity, SwitchEntity):
         """Turn the entity on."""
         code = 0
         if self.state_field == StateField.ACTIVE:
-            code = const.TriggerCode.RELAY_ON
+            code = 1
         elif self.state_field == StateField.ENABLED:
             code = const.TriggerCode.ENABLE_ON
         elif self.state_field == StateField.LOCKED:
@@ -159,7 +159,7 @@ class InuStateSwitch(InuEntity, SwitchEntity):
         """Turn the entity off."""
         code = 0
         if self.state_field == StateField.ACTIVE:
-            code = const.TriggerCode.RELAY_OFF
+            code = 2
         elif self.state_field == StateField.ENABLED:
             code = const.TriggerCode.ENABLE_OFF
         elif self.state_field == StateField.LOCKED:
