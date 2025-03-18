@@ -17,7 +17,7 @@ parser.add_argument('-q', '--quiet', dest='quiet', action='store_true',
 
 parser.add_argument('-c', '--config', dest='config', action='store',
                     help='path to configuration JSON',
-                    default='/etc/sentry.json')
+                    default='/etc/overwatch.json')
 
 
 def safe_exit():

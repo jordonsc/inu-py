@@ -5,13 +5,12 @@ import logging
 import os.path
 import random
 
-from inu import Inu, InuHandler
-from inu import const
+from inu import Inu, InuHandler, const as inu_const
+from inu.schema import Alarm
 from micro_nats import error as mn_error, model
 from micro_nats.jetstream.error import ErrorResponseException
 from micro_nats.jetstream.protocol.consumer import Consumer, ConsumerConfig
 from micro_nats.util import Time
-from overwatch.const import AlarmState
 from overwatch.tts import Tts
 
 
@@ -22,22 +21,22 @@ class Overwatch(InuHandler):
 
         self.voice = None
         self.engine = None
-        self.alarm_id = None
 
-        self.state = AlarmState.DISARMED
+        self.alarm_state = False
+        self.alarm_fn = None
+        self.alarm_preplay = 0
 
         self.load_config(args.config)
         self.tts = Tts(self.voice, self.engine)
 
-        self.inu = Inu(const.Context(
+        self.inu = Inu(inu_const.Context(
             device_id=["overwatch", f"i{random.randint(1000, 9999)}"],
             nats_server=self.get_config("nats", "nats://127.0.0.1:4222"),
         ), self)
 
-        self.consumers = [
-            (const.Streams.COMMAND, const.Subjects.COMMAND, self.on_command),
-        ]
+        self.logger.info(f"Overwatch initialised with voice={self.voice}, engine={self.engine}; alarm={self.alarm_fn}")
 
+        
     def load_config(self, fn):
         """
         Load the settings.json file. Should only ever be called once.
@@ -51,7 +50,8 @@ class Overwatch(InuHandler):
         # Create a log engine from config
         self.voice = self.get_config("voice", "Amy")
         self.engine = self.get_config("engine", "neural")
-        self.alarm_id = self.get_config("alarm_id", "general")
+        self.alarm_fn = self.get_config("alarm_file", None)
+        self.alarm_preplay = self.get_config("alarm_preplay", 0)
 
     def get_config(self, key: str | list, default=None):
         """
@@ -80,23 +80,26 @@ class Overwatch(InuHandler):
         try:
             while True:
                 await asyncio.sleep(0.1)
+
+                if self.alarm_state and not self.tts.playing and self.alarm_fn is not None:
+                        await self.tts.play_from_file(self.alarm_fn, wait=True)
+
         except asyncio.exceptions.CancelledError:
             pass
 
     async def on_connect(self, server: model.ServerInfo):
         self.logger.info("Connected to NATS server")
-        ack_wait = Time.sec_to_nano(1.5)
+        ack_wait = Time.sec_to_nano(10)
 
         try:
-            for stream_name, subj, cb in self.consumers:
-                self.logger.debug(f"Subscribing to '{stream_name}'")
-                await self.inu.js.consumer.create(
-                    Consumer(stream_name, ConsumerConfig(
-                        filter_subject=const.Subjects.all(subj),
-                        deliver_policy=ConsumerConfig.DeliverPolicy.NEW,
-                        ack_wait=ack_wait,
-                    )), cb,
-                )
+            self.logger.info(f"Subscribing to alarm stream..")
+            await self.inu.js.consumer.create(
+                Consumer(inu_const.Streams.COMMAND, ConsumerConfig(
+                    filter_subject=inu_const.Subjects.fqs(inu_const.Subjects.COMMAND, inu_const.Subjects.COMMAND_ALARM),
+                    deliver_policy=ConsumerConfig.DeliverPolicy.NEW,
+                    ack_wait=ack_wait,
+                )), self.on_alarm,
+            )
 
         except mn_error.NotFoundError:
             self.logger.error("Stream not found. Ensure NATS environment is bootstrapped.")
@@ -110,14 +113,38 @@ class Overwatch(InuHandler):
             self.logger.error(f"Subscribe error: {type(e).__name__}: {e}")
             return
 
-    async def on_command(self, msg: model.Message):
+    async def on_alarm(self, msg: model.Message):
         """
-        Command (eg trigger). Send to logging tool.
+        Alarm command received.
         """
-        await self.inu.js.msg.ack(msg)
-        subj = msg.get_subject()[len(const.Subjects.COMMAND) + 1:].split(".", 1)
-        cmd = subj[0]
-        device_id = subj[1]
+        if msg.can_ack():
+            await self.inu.js.msg.in_progress(msg)
 
-        if cmd != "alarm":
-            return
+        alarm = Alarm(msg.get_payload())
+        self.logger.info(f"Alarm command received: {alarm}; stream_seq={msg.stream_seq}, consumer_seq={msg.consumer_seq}")
+
+        if msg.can_ack():
+            await self.inu.js.msg.ack(msg)
+
+        if alarm.active:
+            # Trigger alarm
+            self.alarm_state = True
+
+            # Pre-play alarm sound before speaking the cause
+            if self.alarm_preplay > 0:
+                for _ in range(self.alarm_preplay):
+                    # Check we weren't stood down during pre-play
+                    if self.alarm_state:
+                        await self.tts.play_from_file(self.alarm_fn, wait=True)                    
+
+            if self.alarm_state:
+                # Only play the cause if the alarm is still active (might have been disabled during pre-play)
+                if alarm.cause:
+                    await self.tts.play(alarm.cause)
+                else:
+                    await self.tts.play("Security breach detected")
+        else:
+            # Stand down alarm
+            self.alarm_state = False
+            await self.tts.play("Alarm standing down")
+

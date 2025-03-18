@@ -14,6 +14,7 @@ class Tts:
         self.engine = engine
         self.output_format = output_format
         self.tts_cache = os.path.join(os.path.expanduser("~"), ".inu", "tts-cache")
+        self.playing = False
 
         # Create a client using the credentials and region defined in the [renogy] section of the AWS credentials
         # file (~/.aws/credentials)
@@ -24,6 +25,7 @@ class Tts:
         if self.voice is None or self.engine is None:
             return
 
+        self.playing = True
         msg_hash = self.get_msg_hash(msg)
         if no_cache or not self.has_cache(msg_hash):
             await self.synthesise(msg)
@@ -67,9 +69,22 @@ class Tts:
             raise Exception("Audio stream not in response!")
 
     async def play_from_cache(self, msg_hash, wait=False):
+        self.playing = True
         cmd = ["mpg123", os.path.join(self.tts_cache, msg_hash + "." + self.output_format)]
         if wait:
             subprocess.run(cmd, capture_output=True)
         else:
             subprocess.Popen(cmd, shell=False, stdin=None, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                              close_fds=True)
+        self.playing = False
+
+    async def play_from_file(self, fn, wait=True):
+        self.playing = True
+        cmd = ["mpg123", fn]
+        if wait:
+            subprocess.run(cmd, capture_output=True)
+        else:
+            subprocess.Popen(cmd, shell=False, stdin=None, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                             close_fds=True)
+        self.playing = False
+

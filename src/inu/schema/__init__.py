@@ -109,3 +109,17 @@ class Alert(Schema):
 
         if self.message is None:
             raise Malformed("Alert message cannot be None")
+
+class Alarm(Schema):
+    active: bool = None
+    cause: str = None
+
+    def _validate(self):
+        from ..error import Malformed
+
+        if self.active is None:
+            raise Malformed("Alarm 'active' state cannot be None")
+
+    def __repr__(self):
+        return f"<alarm active={self.active}; cause={self.cause}>"
+

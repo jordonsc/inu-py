@@ -104,6 +104,10 @@ class Subjects:
     # {}
     COMMAND_REBOOT = 'reboot'
 
+    # Fire or reset an alarm
+    # {'active': bool, 'cause': str}
+    COMMAND_ALARM = 'alarm'
+
     # Heartbeats let a controller know that you're still alive and detect devices going offline
     # Includes your build version and LAN IP address
     # {'uptime': int64, 'build': int, 'local_addr': str}
