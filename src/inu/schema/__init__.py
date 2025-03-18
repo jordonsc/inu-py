@@ -123,3 +123,15 @@ class Alarm(Schema):
     def __repr__(self):
         return f"<alarm active={self.active}; cause={self.cause}>"
 
+class Announcement(Schema):
+    message: str = None
+
+    def _validate(self):
+        from ..error import Malformed
+
+        if self.message is None:
+            raise Malformed("Announcement 'message' cannot be None")
+
+    def __repr__(self):
+        return f"<announcement message={self.message}>"
+

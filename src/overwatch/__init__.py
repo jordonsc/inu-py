@@ -6,12 +6,12 @@ import os.path
 import random
 
 from inu import Inu, InuHandler, const as inu_const
-from inu.schema import Alarm
+from inu.schema import Alarm, Announcement
 from micro_nats import error as mn_error, model
 from micro_nats.jetstream.error import ErrorResponseException
 from micro_nats.jetstream.protocol.consumer import Consumer, ConsumerConfig
 from micro_nats.util import Time
-from overwatch.tts import Tts
+from overwatch.audio import AudioController
 
 
 class Overwatch(InuHandler):
@@ -19,16 +19,22 @@ class Overwatch(InuHandler):
         self.logger = logging.getLogger('inu.overwatch')
         self.config = {}
 
+        # Default settings
         self.voice = None
         self.engine = None
-
-        self.alarm_state = False
         self.alarm_fn = None
         self.alarm_preplay = 0
 
-        self.load_config(args.config)
-        self.tts = Tts(self.voice, self.engine)
+        # Alarm active/stand-down state
+        self.alarm_state = False
 
+        # Bring in the JSON config
+        self.load_config(args.config)
+
+        # Audio engine for TTS & alarms
+        self.audio = AudioController(self.voice, self.engine)
+
+        # Inu service for network comms
         self.inu = Inu(inu_const.Context(
             device_id=["overwatch", f"i{random.randint(1000, 9999)}"],
             nats_server=self.get_config("nats", "nats://127.0.0.1:4222"),
@@ -75,19 +81,20 @@ class Overwatch(InuHandler):
         if not await self.inu.init():
             return
 
-        await self.tts.play("Overwatch online")
+        await self.audio.enqueue_tts("Overwatch online")
 
         try:
             while True:
                 await asyncio.sleep(0.1)
+                await self.audio.process_queue()
 
-                if self.alarm_state and not self.tts.playing and self.alarm_fn is not None:
-                        await self.tts.play_from_file(self.alarm_fn, wait=True)
+                if self.alarm_state and not self.audio.has_content():
+                    await self.audio.enqueue_from_file(self.alarm_fn)
 
         except asyncio.exceptions.CancelledError:
             pass
 
-    async def on_connect(self, server: model.ServerInfo):
+    async def on_connect(self, _: model.ServerInfo):
         self.logger.info("Connected to NATS server")
         ack_wait = Time.sec_to_nano(10)
 
@@ -99,6 +106,15 @@ class Overwatch(InuHandler):
                     deliver_policy=ConsumerConfig.DeliverPolicy.NEW,
                     ack_wait=ack_wait,
                 )), self.on_alarm,
+            )
+
+            self.logger.info(f"Subscribing to announcements stream..")
+            await self.inu.js.consumer.create(
+                Consumer(inu_const.Streams.COMMAND, ConsumerConfig(
+                    filter_subject=inu_const.Subjects.fqs(inu_const.Subjects.COMMAND, inu_const.Subjects.COMMAND_ANNOUNCE),
+                    deliver_policy=ConsumerConfig.DeliverPolicy.NEW,
+                    ack_wait=ack_wait,
+                )), self.on_announce,
             )
 
         except mn_error.NotFoundError:
@@ -117,9 +133,6 @@ class Overwatch(InuHandler):
         """
         Alarm command received.
         """
-        if msg.can_ack():
-            await self.inu.js.msg.in_progress(msg)
-
         alarm = Alarm(msg.get_payload())
         self.logger.info(f"Alarm command received: {alarm}; stream_seq={msg.stream_seq}, consumer_seq={msg.consumer_seq}")
 
@@ -130,21 +143,26 @@ class Overwatch(InuHandler):
             # Trigger alarm
             self.alarm_state = True
 
-            # Pre-play alarm sound before speaking the cause
+            # Pre-play alarm sound before speaking the 'cause'
             if self.alarm_preplay > 0:
                 for _ in range(self.alarm_preplay):
-                    # Check we weren't stood down during pre-play
-                    if self.alarm_state:
-                        await self.tts.play_from_file(self.alarm_fn, wait=True)                    
+                    await self.audio.enqueue_from_file(self.alarm_fn)
 
-            if self.alarm_state:
-                # Only play the cause if the alarm is still active (might have been disabled during pre-play)
-                if alarm.cause:
-                    await self.tts.play(alarm.cause)
-                else:
-                    await self.tts.play("Security breach detected")
+            if alarm.cause:
+                await self.audio.enqueue_tts(alarm.cause)
+
         else:
             # Stand down alarm
             self.alarm_state = False
-            await self.tts.play("Alarm standing down")
 
+    async def on_announce(self, msg: model.Message):
+        """
+        Announcement command received.
+        """
+        annnouncement = Announcement(msg.get_payload())
+        self.logger.info(f"Announcement received: {annnouncement}; stream_seq={msg.stream_seq}, consumer_seq={msg.consumer_seq}")
+
+        if msg.can_ack():
+            await self.inu.js.msg.ack(msg)
+
+        await self.audio.enqueue_tts(annnouncement.message)

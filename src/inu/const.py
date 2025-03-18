@@ -108,6 +108,10 @@ class Subjects:
     # {'active': bool, 'cause': str}
     COMMAND_ALARM = 'alarm'
 
+    # Make an announcement, typically a TTS message
+    # {'message': str}
+    COMMAND_ANNOUNCE = 'announce'
+
     # Heartbeats let a controller know that you're still alive and detect devices going offline
     # Includes your build version and LAN IP address
     # {'uptime': int64, 'build': int, 'local_addr': str}
