@@ -113,6 +113,7 @@ class Alert(Schema):
 class Alarm(Schema):
     active: bool = None
     cause: str = None
+    track: str = None
 
     def _validate(self):
         from ..error import Malformed
@@ -121,10 +122,12 @@ class Alarm(Schema):
             raise Malformed("Alarm 'active' state cannot be None")
 
     def __repr__(self):
-        return f"<alarm active={self.active}; cause={self.cause}>"
+        return f"<alarm active={self.active}; cause={self.cause}; track={self.track}>"
 
 class Announcement(Schema):
     message: str = None
+    chime: bool = False
+    track: str = None
 
     def _validate(self):
         from ..error import Malformed
@@ -133,5 +136,5 @@ class Announcement(Schema):
             raise Malformed("Announcement 'message' cannot be None")
 
     def __repr__(self):
-        return f"<announcement message={self.message}>"
+        return f"<announcement message={self.message}; chime={self.chime}; track={self.track}>"
 

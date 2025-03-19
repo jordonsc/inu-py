@@ -22,11 +22,14 @@ class Overwatch(InuHandler):
         # Default settings
         self.voice = None
         self.engine = None
-        self.alarm_fn = None
+        self.alarm_default = None
+        self.announcement_default = None
+        self.audio_base_path = None
         self.alarm_preplay = 0
 
         # Alarm active/stand-down state
         self.alarm_state = False
+        self.alarm_fn = None
 
         # Bring in the JSON config
         self.load_config(args.config)
@@ -40,7 +43,7 @@ class Overwatch(InuHandler):
             nats_server=self.get_config("nats", "nats://127.0.0.1:4222"),
         ), self)
 
-        self.logger.info(f"Overwatch initialised with voice={self.voice}, engine={self.engine}; alarm={self.alarm_fn}")
+        self.logger.info(f"Overwatch initialised with voice={self.voice}, engine={self.engine}; audio_path={self.audio_base_path}")
 
         
     def load_config(self, fn):
@@ -56,7 +59,9 @@ class Overwatch(InuHandler):
         # Create a log engine from config
         self.voice = self.get_config("voice", "Amy")
         self.engine = self.get_config("engine", "neural")
-        self.alarm_fn = self.get_config("alarm_file", None)
+        self.alarm_default = self.get_config("alarm_default", "klaxon-1")
+        self.announcement_default = self.get_config("announcement_default", "announcement-1")
+        self.audio_base_path = self.get_config("audio_path", "/etc/overwatch/audio")
         self.alarm_preplay = self.get_config("alarm_preplay", 0)
 
     def get_config(self, key: str | list, default=None):
@@ -143,6 +148,12 @@ class Overwatch(InuHandler):
             # Trigger alarm
             self.alarm_state = True
 
+            # Alarm track is optional, either use the default or the specified track
+            if alarm.track is not None:
+                self.alarm_fn = os.path.join(self.audio_base_path, f"{alarm.track}.mp3")
+            else:
+                self.alarm_fn = os.path.join(self.audio_base_path, f"{self.alarm_default}.mp3")
+
             # Pre-play alarm sound before speaking the 'cause'
             if self.alarm_preplay > 0:
                 for _ in range(self.alarm_preplay):
@@ -154,6 +165,7 @@ class Overwatch(InuHandler):
         else:
             # Stand down alarm
             self.alarm_state = False
+            self.alarm_fn = None
 
     async def on_announce(self, msg: model.Message):
         """
@@ -164,5 +176,11 @@ class Overwatch(InuHandler):
 
         if msg.can_ack():
             await self.inu.js.msg.ack(msg)
+        
+        # Optionally have an announcement chime before the message
+        if annnouncement.chime:
+            audio_track = annnouncement.track if annnouncement.track is not None else self.announcement_default
+            audio_fn = os.path.join(self.audio_base_path, f"{audio_track}.mp3")
+            await self.audio.enqueue_from_file(audio_fn)
 
         await self.audio.enqueue_tts(annnouncement.message)
