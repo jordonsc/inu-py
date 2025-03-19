@@ -166,12 +166,14 @@ class Hub(InuHandler):
         """
         await self.inu.js.msg.ack(msg)
         subj = msg.get_subject()[len(const.Subjects.COMMAND) + 1:].split(".", 1)
-        cmd = subj[0]
-        device_id = subj[1]
 
-        # send push message for a trigger
-        if cmd == "trigger":
-            self.logger.info(f"Device <{device_id}> triggered")
+        if len(subj) == 2:
+            cmd = subj[0]
+            device_id = subj[1]
+
+            # send push message for a trigger
+            if cmd == "trigger":
+                self.logger.info(f"Device <{device_id}> triggered")
 
     async def add_device(self, device: Device):
         """
