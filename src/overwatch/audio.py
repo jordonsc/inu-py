@@ -9,9 +9,10 @@ import hashlib
 
 
 class AudioController:
-    def __init__(self, voice="Emma", engine="neural", output_format="mp3"):
+    def __init__(self, voice="Emma", engine="neural", output_format="mp3", sample_rate="22050"):
         self.voice = voice
         self.engine = engine
+        self.sample_rate = sample_rate
         self.output_format = output_format
         self.tts_cache = os.path.join(os.path.expanduser("~"), ".inu", "tts-cache")
 
@@ -86,7 +87,7 @@ class AudioController:
         """
         try:
             response = self.polly.synthesize_speech(Text=msg, OutputFormat=self.output_format, VoiceId=self.voice,
-                                                    Engine=self.engine)
+                                                    Engine=self.engine, SampleRate=self.sample_rate)
         except (BotoCoreError, ClientError) as e:
             raise Exception("Boto client error: " + str(e))
 

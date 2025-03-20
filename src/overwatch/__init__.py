@@ -22,6 +22,7 @@ class Overwatch(InuHandler):
         # Default settings
         self.voice = None
         self.engine = None
+        self.sample_rate = None
         self.alarm_default = None
         self.announcement_default = None
         self.audio_base_path = None
@@ -59,6 +60,7 @@ class Overwatch(InuHandler):
         # Create a log engine from config
         self.voice = self.get_config("voice", "Amy")
         self.engine = self.get_config("engine", "neural")
+        self.sample_rate = self.get_config("sample_rate", "22050")
         self.alarm_default = self.get_config("alarm_default", "klaxon-1")
         self.announcement_default = self.get_config("announcement_default", "announcement-1")
         self.audio_base_path = self.get_config("audio_path", "/etc/overwatch/audio")
