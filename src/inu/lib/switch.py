@@ -2,7 +2,7 @@ import time
 
 from inu import const
 from inu.app import InuApp
-from inu.hardware.switch import Switch, SwitchMode
+from inu.hardware.switch import PullMode, Switch, SwitchMode
 
 
 class SwitchManager(InuApp):
@@ -30,15 +30,19 @@ class SwitchManager(InuApp):
             pin = device_cfg(device, ["pin"], None)
             name = device_cfg(device, ["name"], f"s{index}")
             code = device_cfg(device, ["code"], None)
+            pull = device_cfg(device, ["pull"], "down").lower().strip()
+            pull_mode = PullMode.PULL_DOWN if pull == "down" else PullMode.PULL_UP
+
             if not pin:
                 self.logger.error("No pin assigned for switch")
                 continue
-
-            self.switches.append((Switch(pin=pin, mode=mode), name, code))
+            
+            self.switches.append((Switch(pin=pin, mode=mode, pull=pull_mode), name, code))
             index += 1
 
     async def switch_tick(self):
         active = 0
+        active_switches = []
 
         if hasattr(self.inu.settings, "refire_delay"):
             refire_delay = self.inu.settings.refire_delay
@@ -62,6 +66,7 @@ class SwitchManager(InuApp):
 
             if new_state:
                 active += 1
+                active_switches.append(f"{i}")
 
                 if refire_delay and (sw.get_active_time() >= (refire_delay / 1000)):
                     # Send a re-fire trigger
@@ -82,7 +87,7 @@ class SwitchManager(InuApp):
 
             if self.activate_on_switch:
                 if active > 0:
-                    await self.inu.activate(f"Active: {active}")
+                    await self.inu.activate(f"Active: {' '.join(active_switches)}")
                 else:
                     await self.inu.deactivate()
 
