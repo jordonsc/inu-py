@@ -140,8 +140,14 @@ class Overwatch(InuHandler):
         """
         Alarm command received.
         """
-        alarm = Alarm(msg.get_payload())
-        self.logger.info(f"Alarm command received: {alarm}; stream_seq={msg.stream_seq}, consumer_seq={msg.consumer_seq}")
+        try:
+            alarm = Alarm(msg.get_payload())
+            self.logger.info(f"Alarm command received: {alarm}; stream_seq={msg.stream_seq}, consumer_seq={msg.consumer_seq}")
+        except:
+            self.logger.error(f"Alarm decode error: {msg.get_payload()}")
+            if msg.can_ack():
+                await self.inu.js.msg.term(msg)
+            return
 
         if msg.can_ack():
             await self.inu.js.msg.ack(msg)
@@ -173,8 +179,14 @@ class Overwatch(InuHandler):
         """
         Announcement command received.
         """
-        annnouncement = Announcement(msg.get_payload())
-        self.logger.info(f"Announcement received: {annnouncement}; stream_seq={msg.stream_seq}, consumer_seq={msg.consumer_seq}")
+        try:
+            annnouncement = Announcement(msg.get_payload())
+            self.logger.info(f"Announcement received: {annnouncement}; stream_seq={msg.stream_seq}, consumer_seq={msg.consumer_seq}")
+        except:
+            self.logger.error(f"Announcement decode error: {msg.get_payload()}")
+            if msg.can_ack():
+                await self.inu.js.msg.term(msg)
+            return
 
         if msg.can_ack():
             await self.inu.js.msg.ack(msg)
